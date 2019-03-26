@@ -1,0 +1,121 @@
+<style lang="less">
+  page {
+    width: 100%;
+    height: 100%;
+    background: #101720;
+  }
+</style>
+
+<script>
+  import wepy from 'wepy'
+  import 'wepy-async-function'
+  import WepyEx from '@hzct/wepy-promisify'
+  import Global from './common/global.js'
+
+  export default class extends wepy.app {
+    constructor() {
+      super()
+      this.use('requestfix')
+      WepyEx.promisify();
+      WepyEx.polyfill();
+    }
+    config = {
+      pages: [
+        'pages/home',
+        'pages/detail',
+        'pages/reply',
+        'pages/login',
+        'pages/user',
+        'pages/addAlbum',
+        'pages/album-detail',
+        'pages/search',
+        'pages/cropper',
+        'pages/topic',
+        'pages/topic-detail',
+        'pages/hot-world'
+      ],
+      window: {
+        backgroundTextStyle: 'light',
+        enablePullDownRefresh: true,
+        backgroundColor: '#101720',
+        navigationBarBackgroundColor: '#101720',
+        navigationBarTitleText: '海鸥看世界',
+        navigationBarTextStyle: '#b3b3c1'
+      },
+      'networkTimeout': {
+        'request': 30000,
+        'connectSocket': 30000,
+        'uploadFile': 60000,
+        'downloadFile': 60000
+      },
+      'requiredBackgroundModes': [
+        'audio'
+      ]
+    }
+    globalData = {
+      scene: '',
+      shareTicket: '',
+      referrerInfo: {}
+    }
+    onShow(options) {
+      const _this = this;
+      if (options) {
+        const launcher = {
+          path: String(options.path || ''),
+          query: Object.assign({}, options.query)
+        };
+        const scene = String(options.scene || '');
+        const shareTicket = String(options.shareTicket || '');
+        const referrerInfo = Object.assign({}, options.referrerInfo);
+        if ('1011' === scene) {
+          const parseUrlSearchParams = (str) => {
+            if (typeof str !== 'string') {
+              return {};
+            }
+            return decodeURI(str).split('&').map(param => {
+              const tmp = param.split('=');
+              const key = tmp[0];
+              let value = tmp[1] || true;
+              if (typeof value === 'string' && isNaN(Number(value)) === false) {
+                value = Number(value);
+              }
+              return {
+                key,
+                value
+              };
+            }).reduce((params, item) => {
+              const {
+                key,
+                value
+              } = item;
+              if (typeof params[key] === 'undefined') {
+                params[key] = value;
+              } else {
+                params[key] = Array.isArray(params[key]) ? params[key] : [params[key]];
+                params[key].push(value);
+              }
+              return params;
+            }, {});
+          };
+          const qUrl = decodeURIComponent(launcher.query.q);
+          const qSearchString = qUrl.substring(qUrl.indexOf('?') + 1);
+          const qSearchParams = (typeof UrlSearchParams === 'function') ? new UrlSearchParams(qSearchString) : parseUrlSearchParams(qSearchString);
+          if (typeof qSearchParams === 'object') {
+            launcher.query = Object.assign(launcher.query, qSearchParams);
+          }
+        }
+        _this.globalData.launcher = launcher;
+        _this.globalData.scene = scene;
+        _this.globalData.shareTicket = shareTicket;
+        _this.globalData.referrerInfo = referrerInfo;
+        // console.info('GlobalData: ', _this.globalData);
+      }
+    }
+    onError(err) {
+      console.error(err);
+    }
+    onPageNotFound() {
+      Global.$app.relaunch();
+    }
+  }
+</script>

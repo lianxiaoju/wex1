@@ -1,0 +1,308 @@
+<template>
+  <view class='topic-detail'>
+    <view class="bg">
+      <image src="../images/bg2.png" />
+    </view>
+    <view class="content">
+      <view class="info">
+        <image class="picture" src="{{topicDetail.iconFileKeyUrl}}" />
+        <image class="haiou" src="../images/haiou.png" />
+        <text class="name">{{topicDetail.name}}</text>
+        <view class="follow"><text>{{topicDetail.followCount}}</text>粉丝</view>
+        <view class="add" wx:if="{{!topicDetail.isFollowed}}" @tap="attentionTopicFn">
+          <image src="../images/add-up.png" />
+        </view>
+        <view class="remove" wx:if="{{topicDetail.isFollowed}}" @tap="unAttentionTopicFn">
+          <image src="../images/love.png" />
+        </view>
+      </view>
+      <text class="desc {{isShow ? '' : 'ellipsis'}}">{{topicDetail.desc}}</text>
+      <view wx:if="{{!isShow}}" class="operation" @tap="showFn">
+        <text>展开</text>
+        <image src="../images/open2.png" />
+      </view>
+      <view wx:if="{{isShow}}" class="operation" @tap="hideFn">
+        <text>收起</text>
+        <image src="../images/hide.png" />
+      </view>
+      <view class="video">
+        <text class="title">相关视频<text class="count">{{totalCount}}</text></text>
+        <view class="video-box">
+          <view wx:for="{{videoList}}" @tap="detailFn" data-sid="{{item.sid}}" wx:key="{{index}}" class="video-item">
+            <image src="{{item.thumbFileKeyUrl}}" />
+            <text class="ellip">{{item.zhName}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+    <toast/>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy';
+  import Service from '../common/services';
+  import Utils from '../common/util';
+  import UIToast from '../components/ui-toast';
+  export default class Example extends wepy.page {
+    config = {
+      enablePullDownRefresh: false
+    }
+    data = {
+      sid: '',
+      topicDetail: {},
+      totalCount: 0,
+      videoList: [],
+      page: 1,
+      isShow: false
+    };
+    components = {
+      'toast': UIToast
+    };
+    methods = {
+      attentionTopicFn(e) {
+        Service.$topic.followTopic(this.sid).then(() => {
+          this.topicDetail.isFollowed = true
+          this.$apply()
+          this.$invoke('toast', 'show', {
+            content: '关注成功',
+            position: 'center'
+          });
+        })
+      },
+      unAttentionTopicFn(e) {
+        Service.$topic.undoFollowTopic(this.sid).then(() => {
+          this.topicDetail.isFollowed = false
+          this.$apply()
+          this.$invoke('toast', 'show', {
+            content: '取消关注成功',
+            position: 'center'
+          });
+        })
+      },
+      showFn() {
+        this.isShow = true;
+        this.$apply()
+      },
+      hideFn() {
+        this.isShow = false;
+        this.$apply()
+      },
+      detailFn(e) {
+        const sid = e.currentTarget.dataset.sid;
+        this.$navigate({
+          url: '../../detail?sid=' + sid
+        });
+      }
+    };
+    onLoad(option) {
+      this.sid = option.sid
+      Service.$topic.getTopicBySID(this.sid).then(res => {
+        res.data.desc = res.data.desc.substring(0, res.data.desc.match('。').index + 1) + '\n' + res.data.desc.substring(res.data.desc.match('。').index + 1)
+        Utils.$file.getUrl({
+          sid: res.data.iconBucketSid,
+          fileKey: res.data.iconFileKey
+        }).then(url => {
+          res.data.iconFileKeyUrl = url
+          this.topicDetail = res.data
+          this.$apply()
+        })
+      })
+      this._getByTopicVideoList();
+    };
+    onReachBottom() {
+      if (this.totalCount <= this.page * 10) {
+        return;
+      }
+      this.page++;
+      this.$apply();
+      this._getByTopicVideoList();
+    }
+    _getByTopicVideoList() {
+      return Service.$topic.getByTopicVideoList({
+        topic_sid: this.sid,
+        limit: 10,
+        page: this.page
+      }).then(res => {
+        this.totalCount = res.data.totalCount;
+        this.$apply()
+        this._getUrl(res.data.items).then(res => {
+          if (this.page === 1) {
+            this.videoList = res
+          } else {
+            this.videoList = this.videoList.concat(res);
+          }
+          this.$apply();
+          return Promise.resolve(res);
+        })
+      })
+    }
+    _getUrl(arr) {
+      const formatData = arr.map((item, index) => {
+        Utils.$file.getUrl({
+          sid: item.thumbBucketSid,
+          fileKey: item.thumbFileKey
+        }).then(url => {
+          item.thumbFileKeyUrl = url;
+          this.$apply()
+        })
+        return item;
+      })
+      return Promise.resolve(formatData)
+    }
+  }
+</script>
+
+<style lang='less'>
+.topic-detail {
+  width: 100%;
+  height: 100%;
+  .bg {
+    width: 100%;
+    height: 240rpx;
+    image {
+      width: 100%;
+      height: 240rpx;
+      position: relative;
+    }
+  }
+  .content {
+    padding: 0 32rpx;
+  }
+  .info {
+    display: flex;
+    justify-content: space-between;
+    .name {
+      margin-top: 102rpx;
+      color: #b3b3c1;
+      color: 40rpx;
+    }
+    .follow {
+      color: #808283;
+      font-size: 26rpx;
+      margin-top: 38rpx;
+      text {
+        color: #ffffff;
+        font-size: 48rpx;
+        margin-right: 16rpx;
+        font-weight: bold;
+      }
+    }
+    .add {
+      width: 144rpx;
+      height: 60rpx;
+      margin-top: 32rpx;
+      background: #eb445a;
+      border-radius: 8rpx;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      image {
+        width: 20rpx;
+        height: 20rpx;
+      }
+    }
+    .remove {
+      width: 144rpx;
+      height: 60rpx;
+      margin-top: 32rpx;
+      background: rgba(255, 255, 255, .4);
+      border-radius: 10rpx;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      image {
+        width: 30rpx;
+        height: 20rpx;
+      }
+    }
+  }
+  .picture {
+    width: 140rpx;
+    height: 140rpx;
+    border-radius: 50%;
+    position: absolute;
+    top: 170rpx;
+    left: 32rpx;
+  }
+  .haiou {
+    width: 44rpx;
+    height: 44rpx;
+    position: absolute;
+    top: 266rpx;
+    left: 132rpx;
+  }
+  .desc {
+    display: inline-block;
+    color: #878d92;
+    font-size: 26rpx;
+    line-height: 40rpx;
+    margin-top: 32rpx;
+  }
+  .ellipsis {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+  }
+  .operation {
+    font-size: 26rpx;
+    color: #b3b3c1;
+    margin-top: 28rpx;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    border-bottom: 1px solid #b3b3c1;
+    padding-bottom: 32rpx;
+    image {
+      width: 20rpx;
+      height: 14rpx;
+      margin-left: 8rpx;
+    }
+  }
+  .video {
+    margin-top: 80rpx;
+    .title {
+      font-size: 30rpx;
+      color: #6f727d;
+      .count {
+        font-size: 36rpx;
+        margin-left: 16rpx;
+        font-weight: bold;
+      }
+    }
+    .video-box {
+      margin-top: 32rpx;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      .video-item {
+        width: 334rpx;
+        margin: 16rpx 0;
+        &:nth-child(1) {
+          margin: 0;
+        }
+        &:nth-child(2) {
+          margin: 0;
+        }
+        image {
+          width: 334rpx;
+          height: 194rpx;
+          border-radius: 16rpx;
+        }
+        .ellip {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          font-size: 30rpx;
+          color: #b3b3c1;
+          margin-top: 24rpx;
+        }
+      }
+    }
+  }
+}
+</style>

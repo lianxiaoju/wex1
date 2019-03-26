@@ -1,0 +1,257 @@
+<template>
+  <view class='topic-page'>
+    <view class="banner">
+      <image src="../images/Bitmap.png" />
+      <view class="tip">
+        <text>定制你感兴趣的话题</text>
+        <text class="con">关注话题后，当有内容更新动态时，可以在“关注”中第一时间看到</text>
+      </view>
+    </view>
+    <view class="topic-box">
+      <view class="topic-type">
+        <text class="item {{ind === index ? 'active' : ''}}" @tap="onNavClick" data-ind="{{index}}" data-topics="{{item.topics}}" wx:for="{{arrTopicType}}" wx:key="{{index}}">{{item.name}}</text>
+      </view>
+      <view class="topic-content">
+        <view class="content-item" wx:for="{{arrTopicList}}" wx:key="{{index}}">
+          <image class="img" src="{{item.iconFileKeyUrl}}" />
+          <view class="info">
+            <text class="name">{{item.name}}</text>
+            <text class="desc ellipsis">{{item.intro}}</text>
+          </view>
+          <view class="add" wx:if="{{!item.isFollowed}}" @tap="attentionTopicFn" data-index="{{index}}" data-sid="{{item.sid}}">
+            <image src="../images/add-up.png" />
+          </view>
+          <view class="remove" wx:if="{{item.isFollowed}}" @tap="unAttentionTopicFn" data-index="{{index}}" data-sid="{{item.sid}}">
+            <image src="../images/love.png" />
+          </view>
+        </view>
+      </view>
+    </view>
+    <toast/>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy';
+  import Service from '../common/services';
+  import Utils from '../common/util';
+  import UIToast from '../components/ui-toast';
+  export default class Topic extends wepy.page {
+    data = {
+      arrTopicType: [],
+      arrTopicList: [],
+      ind: 0
+    };
+    components = {
+      'toast': UIToast
+    };
+    onLoad() {
+      Service.$topic.getTopicRecommendedCategoryList().then(res => {
+        this.arrTopicType = res.data.items
+        this.$apply()
+        this._getUrl(res.data.items[0].topics).then(res => {
+          this.arrTopicList = res
+          this.$apply();
+        })
+      })
+    }
+    methods = {
+      onNavClick(e) {
+        const topics = e.currentTarget.dataset.topics;
+        const ind = e.currentTarget.dataset.ind;
+        this.ind = ind;
+        this.$apply()
+        this._getUrl(topics).then(res => {
+          this.arrTopicList = res
+          this.$apply();
+        })
+      },
+      attentionTopicFn(e) {
+        const ind = e.currentTarget.dataset.index;
+        const sid = e.currentTarget.dataset.sid;
+        Service.$topic.followTopic(sid).then(() => {
+          this.arrTopicList.forEach((item, index) => {
+            if (ind === index) {
+              item.isFollowed = true
+            }
+          })
+          this.$apply()
+          this.$invoke('toast', 'show', {
+            content: '关注成功',
+            position: 'center'
+          });
+        })
+      },
+      unAttentionTopicFn(e) {
+        const ind = e.currentTarget.dataset.index;
+        const sid = e.currentTarget.dataset.sid;
+        Service.$topic.undoFollowTopic(sid).then(() => {
+          this.arrTopicList.forEach((item, index) => {
+            if (ind === index) {
+              item.isFollowed = false
+            }
+          })
+          this.$apply()
+          this.$invoke('toast', 'show', {
+            content: '取消关注成功',
+            position: 'center'
+          });
+        })
+      }
+    };
+    _getUrl(arr) {
+      const formatData = arr.map((item, index) => {
+        Utils.$file.getUrl({
+          sid: item.iconBucketSid,
+          fileKey: item.iconFileKey
+        }).then(url => {
+          item.iconFileKeyUrl = url
+          this.$apply()
+        })
+        return item;
+      })
+      return Promise.resolve(formatData)
+    }
+  }
+</script>
+
+<style lang='less'>
+.topic-page {
+  width: 100%;
+  height: 100%;
+  .banner {
+    width: 100%;
+    height: 380rpx;
+    position: relative;
+    image {
+      width: 100%;
+      height: 380rpx;
+    }
+    .tip {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: absolute;
+      top: 100rpx;
+      left: 80rpx;
+      right: 80rpx;
+      bottom: 80rpx;
+      font-size: 48rpx;
+      color: #ffffff;
+      .con {
+        margin-top: 32rpx;
+        font-size: 30rpx;
+        line-height: 48rpx;
+        text-align: center;
+      }
+    }
+  }
+  .topic-box {
+    padding: 0 32rpx;
+  }
+  .topic-type {
+    display: flex;
+    flex-wrap: wrap;
+    padding: 40rpx 0;
+    .item {
+      width: 156rpx;
+      height: 60rpx;
+      border-radius: 8rpx;
+      text-align: center;
+      line-height: 60rpx;
+      margin: 12rpx 20rpx 12rpx 0;
+      background: #17202b;
+      color: #b3b3c1;
+      font-size: 26rpx;
+      overflow: hidden;
+      text-overflow:ellipsis;
+      white-space: nowrap;
+      &:nth-child(4n) {
+        margin-right: 0;
+      }
+    }
+    .active {
+      color: #eb445a
+    }
+  }
+  .topic-content {
+    display: flex;
+    flex-wrap: wrap;
+    border-radius: 16rpx;
+    background: #17202b;
+    .content-item {
+      width: 33%;
+      padding: 24rpx 16rpx;
+      box-sizing: border-box;
+      &:nth-child(3n) {
+        margin-right: 0;
+      }
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #b3b3c1;
+      font-size: 30rpx;
+      .info {
+        width: 100%;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        font-size: 26rpx;
+        .name {
+          width: 100%;
+          text-align: center;
+          overflow: hidden;
+          text-overflow:ellipsis;
+          white-space: nowrap;
+          margin-top: 24rpx;
+        }
+        .desc {
+          text-align: center;
+          margin-top: 16rpx;
+          font-size: 22rpx;
+        }
+      }
+      .img {
+        width: 90rpx;
+        height: 90rpx;
+        border-radius: 50%;
+      }
+      .add {
+        width: 104rpx;
+        height: 44rpx;
+        margin-top: 24rpx;
+        background: #eb445a;
+        border-radius: 8rpx;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        image {
+          width: 20rpx;
+          height: 20rpx;
+        }
+      }
+      .remove {
+        width: 104rpx;
+        height: 44rpx;
+        margin-top: 20rpx;
+        background: rgba(255, 255, 255, .4);
+        border-radius: 10rpx;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        image {
+          width: 24rpx;
+          height: 16rpx;
+        }
+      }
+    }
+  }
+  .ellipsis {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+}
+</style>

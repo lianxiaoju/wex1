@@ -1,0 +1,44 @@
+{
+	"description": "A WePY project",
+	"setting": {
+		"urlCheck": true,
+		"es6": false,
+		"postcss": false,
+		"minified": false,
+		"newFeature": true,
+		"autoAudits": false
+	},
+	"compileType": "miniprogram",
+	"appid": "wx0f20a4e8bc216146",
+	"projectname": "wx_kanshijie",
+	"miniprogramRoot": "dist/",
+	"condition": {
+		"search": {
+			"current": -1,
+			"list": []
+		},
+		"conversation": {
+			"current": -1,
+			"list": []
+		},
+		"plugin": {
+			"current": -1,
+			"list": []
+		},
+		"game": {
+			"list": []
+		},
+		"miniprogram": {
+			"current": 0,
+			"list": [
+				{
+					"id": 0,
+					"name": "qrcode",
+					"pathName": "pages/home",
+					"query": "action=video.shared&video_sid=2060a74d148e471bb103a196f897d2b2",
+					"scene": "1011"
+				}
+			]
+		}
+	}
+}

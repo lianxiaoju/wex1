@@ -1,0 +1,330 @@
+<template>
+  <view class='user-page'>
+    <view class="header">
+      <image src="{{user.avatarUrl}}" />
+      <text class="nickname">{{user.nickname}}</text>
+      <text class="intro">{{user.intro}}</text>
+      <button class="btn" @tap="createAlbum">创建新专辑</button>
+    </view>
+    <view class="album">
+      <view class="total">共{{totalCount}}个专辑</view>
+      <view class="album-item" wx:for="{{albumList}}" wx:key="{{index}}" @tap="albumDetail" data-sid="{{item.sid}}">
+        <image class="pic" src="{{item.thumbFileKeyUrl}}" />
+        <image class="more" @tap.stop="moreFn" data-sid="{{item.sid}}" data-isonline="{{item.isOnline}}" src="../images/more.png" />
+        <view class="con">
+          <text class="title">{{item.name}}</text>
+          <text class="des">{{item.description}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="dialog" @tap.stop="hideFn" hidden="{{!isHidden}}">
+      <view class="wrap" @tap.stop="showFn">
+        <view>删除</view>
+        <view wx:if="{{isOnline === 1}}">下线</view>
+        <view wx:if="{{isOnline !== 1}}">上线</view>
+      </view>
+    </view>
+    <loading/>
+    <toast/>
+    <dialog/>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy';
+  import Global from '../common/global.js'
+  import Service from '../common/services'
+  import Utils from '../common/util';
+  import UILoading from '../components/ui-loading';
+  import UIToast from '../components/ui-toast';
+  import UIDialog from '../components/ui-dialog';
+  export default class User extends wepy.page {
+    components = {
+      'loading': UILoading,
+      'toast': UIToast,
+      'dialog': UIDialog
+    }
+    config = {
+      navigationBarBackgroundColor: '#0b1016',
+      navigationBarTitleText: ''
+    };
+    data = {
+      user: {
+        nickname: '',
+        avatarUrl: '',
+        intro: '',
+        albumSid: ''
+      },
+      page: 1,
+      albumList: [],
+      totalCount: 0,
+      isHidden: false,
+      isOnline: 0
+    };
+    onLoad(option) {
+      if (option.flag === 'true') {
+        Service.$album.albumOnline(option.albumsid).then(res => {
+          this._getAlbumList()
+        })
+      }
+      const currentUser = Global.$data.currentUser;
+      Utils.$file.getUrl({
+        sid: currentUser.avatarBucketSid,
+        fileKey: currentUser.avatarFileKey
+      }).then(url => {
+        this.user.avatarUrl = 'https:' + url;
+        this.user.nickname = currentUser.nickname
+        this.user.intro = currentUser.intro;
+        this.$apply()
+      })
+      this._getAlbumList()
+    };
+    onRoute() {
+      this._getAlbumList()
+    }
+    methods = {
+      moreFn(e) {
+        this.isHidden = true;
+        this.albumSid = e.currentTarget.dataset.sid;
+        this.isOnline = e.currentTarget.dataset.isonline;
+        this.$apply()
+      },
+      hideFn() {
+        this.isHidden = false;
+        this.$apply()
+      },
+      showFn(e) {
+        const _this = this;
+        _this.isHidden = true;
+        _this.$apply()
+        if (e._relatedInfo.anchorTargetText === "删除") {
+          wx.showModal({
+            title: '提示',
+            content: '确定要删除该专辑吗？',
+            success(res) {
+              if (res.confirm) {
+                Service.$album.removeAlbum(_this.albumSid).then(res => {
+                  _this.isHidden = false;
+                  _this.$apply()
+                  _this.$invoke('toast', 'show', {
+                    content: '删除成功',
+                    position: 'center'
+                  });
+                  _this._getAlbumList()
+                })
+              }
+            }
+          })
+        } else if (e._relatedInfo.anchorTargetText === "下线") {
+          wx.showModal({
+            title: '提示',
+            content: '确定要下线该专辑吗？',
+            success(res) {
+              if (res.confirm) {
+                Service.$album.albumOffline(_this.albumSid).then(res => {
+                  _this.isHidden = false;
+                  _this.$apply()
+                  _this.$invoke('toast', 'show', {
+                    content: '下线成功',
+                    position: 'center'
+                  });
+                  _this._getAlbumList()
+                })
+              }
+            }
+          })
+        } else if (e._relatedInfo.anchorTargetText === "上线") {
+          wx.showModal({
+            title: '提示',
+            content: '确定要上线该专辑吗？',
+            success(res) {
+              if (res.confirm) {
+                Service.$album.albumOnline(_this.albumSid).then(res => {
+                  _this.isHidden = false;
+                  _this.$apply()
+                  _this.$invoke('toast', 'show', {
+                    content: '上线成功',
+                    position: 'center'
+                  });
+                  _this._getAlbumList()
+                })
+              }
+            }
+          })
+        }
+      },
+      createAlbum() {
+        this.$redirect({
+          url: '../../addAlbum'
+        });
+      },
+      albumDetail(e) {
+        const sid = e.currentTarget.dataset.sid
+        this.$navigate({
+          url: '../../album-detail?sid=' + sid
+        })
+      }
+    }
+    onReachBottom() {
+      if (this.totalCount <= this.page * 10) {
+        return;
+      }
+      this.page++;
+      this.$apply();
+      this._getAlbumList();
+    }
+    onPullDownRefresh() {
+      this._getAlbumList().then(() => {
+        wx.stopPullDownRefresh();
+      })
+    }
+    _getAlbumList() {
+      return Service.$album.albumList({
+        "page": this.page,
+        "limit": 10,
+        "user_sid": Global.$data.currentUser.userSid
+      }).then(res => {
+        this.totalCount = res.data.totalCount;
+        this.$apply()
+        if (!res.data.items || res.data.items.length === 0) {
+          this.albumList = [];
+          this.$apply()
+          return;
+        }
+        this._getUrl(res.data.items).then(res => {
+          if (this.page === 1) {
+            this.albumList = res
+          } else {
+            this.albumList = this.albumList.concat(res);
+          }
+          this.$apply();
+          return Promise.resolve(res);
+        })
+      })
+    }
+    _getUrl(arr) {
+      const formatData = arr.map((item, index) => {
+        Utils.$file.getUrl({
+          sid: item.thumbBucketSid,
+          fileKey: item.thumbFileKey
+        }).then(url => {
+          item.thumbFileKeyUrl = url;
+          this.$apply()
+        })
+        return item;
+      })
+      return Promise.resolve(formatData)
+    }
+  }
+</script>
+
+<style lang="less">
+.user-page {
+  width: 100%;
+  height: 100%;
+  .header {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: #0b1016;
+    padding-top: 16rpx;
+    image {
+      width: 140rpx;
+      height: 140rpx;
+      border-radius: 50%;
+    }
+    .nickname {
+      font-size: 40rpx;
+      color: #ffffff;
+      margin-top: 24rpx;
+    }
+    .intro {
+      font-size: 30rpx;
+      color: #808283;
+      margin-top: 16rpx;
+    }
+    .btn {
+      width: 220rpx;
+      height: 72rpx;
+      line-height: 72rpx;
+      text-align: center;
+      margin-top: 52rpx;
+      background: #eb445a;
+      color: #ffffff;
+      font-size: 30rpx;
+      border-radius: 8rpx;
+      margin-bottom: 80rpx;
+    }
+  }
+  .album {
+    padding: 0 32rpx;
+    .total {
+      padding: 52rpx 0;
+      color: #b3b3c1;
+      font-size: 30rpx;
+    }
+    .album-item {
+      margin: 8rpx 0;
+      position: relative;
+      background: #17202b;
+      border-radius: 16rpx;
+      &:nth-child(1) {
+        margin-top: 0;
+      }
+      .pic {
+        width: 686rpx;
+        height: 300rpx;
+        border-radius: 16rpx 16rpx 0 0;
+      }
+      .more {
+        width: 8rpx;
+        height: 24rpx;
+        position: absolute;
+        top: 0;
+        right: 4rpx;
+        padding: 28rpx;
+      }
+      .con {
+        display: flex;
+        flex-direction: column;
+        padding: 32rpx 24rpx;
+        .title {
+          font-size: 40rpx;
+          color: #b3b3c1;
+        }
+        .des {
+          font-size: 26rpx;
+          color: #6f727d;
+          margin-top: 26rpx;
+          line-height: 40rpx;
+        }
+      }
+    }
+  }
+  .dialog {
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, .3);
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    .wrap {
+      width: 100%;
+      position: fixed;
+      left: 0;
+      bottom: 0;
+      view {
+        padding: 52rpx 32rpx;
+        text-align: center;
+        font-size: 30rpx;
+        color: #b3b3c1;
+        background: #17202b;
+        border-bottom: 1px solid #101720;
+      }
+    }
+  }
+}
+</style>

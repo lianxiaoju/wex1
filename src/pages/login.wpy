@@ -1,0 +1,161 @@
+<style lang="less">
+  .container {
+    width: 100%;
+    height: 100%;
+  }
+  .header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    .icon {
+      width: 200rpx;
+      height: 200rpx;
+      margin-top: 252rpx;
+    }
+    .logo {
+      width: 206rpx;
+      height: 44rpx;
+      margin-top: 32rpx;
+    }
+  }
+  .footer {
+    margin-top: 426rpx;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    .btn {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 550rpx;
+      height: 98rpx;
+      font-size: 30rpx;
+      background: #eb445a;
+      image {
+        width: 44rpx;
+        height: 34rpx;
+        margin-right: 10rpx;
+      }
+    }
+    .text {
+      color: #878d92;
+      font-size: 22rpx;
+      margin-top: 52rpx;
+    }
+  }
+</style>
+
+<template lang="wxml">
+  <view class="container">
+    <view class="header">
+      <image class="icon" src="../images/icon.png" />
+      <image class="logo" src="../images/logo1.png" />
+    </view>
+    <view class="footer">
+      <button class="btn" type="primary" open-type="getUserInfo" lang="zh_CN" @getuserinfo="ongetUserInfo"><image src="../images/wx1.png" />微信登录</button>
+      <text class="text">登录即表示同意《海鸥看世界用户协议》</text>
+    </view>
+  </view>
+  <ui-toast />
+  <ui-loading />
+  <ui-dialog />
+</template>
+
+<script>
+  import wepy from 'wepy';
+  import UIToast from '../components/ui-toast';
+  import UILoading from '../components/ui-loading';
+  import UIDialog from '../components/ui-dialog';
+  import Util from '@hzct/js-utils';
+  import Service from '../common/services';
+  import Global from '../common/global';
+  export default class Index extends wepy.page {
+    config = {
+      navigationBarTitleText: '微信登录',
+      enablePullDownRefresh: false,
+      disableScroll: true
+    };
+    components = {
+      'ui-toast': UIToast,
+      'ui-loading': UILoading,
+      'ui-dialog': UIDialog
+    };
+    data = {
+      config: {}
+    };
+    methods = {
+      ongetUserInfo(e) {
+        const _this = this;
+        if (!e.detail.errMsg || e.detail.errMsg.includes('ok')) {
+          console.info('[LOGIN] STEP 0: wx.getUserInfo()');
+          _this._login({
+            encryptedData: e.detail.encryptedData,
+            iv: e.detail.iv
+          });
+        } else {
+          _this._alertAuthSetting();
+        }
+      }
+    };
+    _login(loginUserInfo = {}) {
+      const _this = this;
+      _this.$invoke('ui-loading', 'show', '登录中');
+      wx.loginAsync()
+        .then(res => {
+          console.info('[LOGIN] STEP 1: wx.login()');
+          return Service.$token.getToken({
+            code: res.code,
+            encryptedData: loginUserInfo.encryptedData,
+            iv: loginUserInfo.iv
+          });
+        })
+        .then(tokenInfo => {
+          console.info('[LOGIN] STEP 2: $token.getTokenByWxJSCode()');
+          const userId = tokenInfo.data.user.sid;
+          const appToken = tokenInfo.data.token.accessToken;
+          const auth = `${userId}:${appToken}`;
+          Service.restClient.authorization = `Bearer ${Util.$$encrypt.encodeBase64(auth)}`
+          return Service.$user.getUserById(userId);
+        })
+        .then(userInfo => {
+          console.info('[LOGIN] STEP 3: $user.getUserById()');
+          Global.$data.currentUser = userInfo.data;
+          // resolve(Global.$data.currentUser);
+          console.log('[LOGIN] STEP 5: callback');
+          return Promise.resolve(Global.$data.currentUser);
+        })
+        .then(res => {
+          console.info('[LOGIN] STEP 4: navigate back');
+          _this.$invoke('ui-loading', 'hide');
+          _this.$invoke('ui-toast', 'show', '登录成功');
+          _this.$back();
+        })
+        .catch(err => {
+          console.error('[登录失败]', err);
+          if (err && err.errMsg && err.errMsg.includes('deny')) {
+            _this._alertAuthSetting();
+          } else {
+            _this.$invoke('ui-loading', 'hide');
+            _this.$invoke('ui-toast', 'show', '登录失败，请重试');
+          }
+        });
+    }
+    /**
+     *
+     */
+    _alertAuthSetting() {
+      const _this = this;
+      _this.$invoke('ui-dialog', 'confirm', {
+        title: '登录失败',
+        content: '请在设置中授权允许获取用户信息',
+        confirmText: '去设置',
+        success: res => {
+          if (1 === res.index) {
+            wx.openSetting();
+          }
+        }
+      });
+    }
+  }
+</script>

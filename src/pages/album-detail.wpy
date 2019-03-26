@@ -1,0 +1,344 @@
+<template>
+  <view class='detail-page'>
+    <view class="pic">
+      <image src="{{albumDetail.thumbFileKeyUrl}}" />
+      <view class="word">
+        <text class="title">{{albumDetail.name}}</text>
+        <text class="intro">{{albumDetail.description}}</text>
+        <text class="edit" @tap="editFn">编辑</text>
+      </view>
+    </view>
+    <view class="box">
+      <view class="operation">
+        <view class="btn" @tap="addVideo">
+          <image src="../images/add-up.png" />添加视频</view>
+      </view>
+      <view class="container">
+        <view wx:for="{{videoList}}" wx:key="{{index}}" class="container-item">
+          <image class="fm" src="{{item.video.thumbFileKeyUrl}}" />
+          <view class="des">
+            <text>{{item.video.zhName}}</text>
+            <view class="time">
+              <text>发布时间：{{item.video.publishTime}}</text>
+              <image wx:if="{{!isSort}}" class="remove" @tap.stop="removeVideo" data-index="{{index}}" data-videosid="{{item.video.sid}}" src="../images/remove.png" />
+              <!-- <image wx:if="{{isSort}}" data-index='{{index}}' class="combined" src="../images/combined.png" /> -->
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+    <loading/>
+    <toast/>
+    <dialog/>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy';
+  import Global from '../common/global.js'
+  import Service from '../common/services';
+  import Utils from '../common/util'
+  import UILoading from '../components/ui-loading';
+  import UIToast from '../components/ui-toast';
+  import UIDialog from '../components/ui-dialog';
+  export default class AlbumDetail extends wepy.page {
+    components = {
+      'loading': UILoading,
+      'toast': UIToast,
+      'dialog': UIDialog
+    }
+    data = {
+      isSort: false,
+      videoList: [],
+      albumDetail: {},
+      sid: '',
+      page: 1,
+      totalCount: 0
+    };
+    onLoad(option, data) {
+      this.sid = option.sid;
+      this.$apply()
+      if (data.preload) {
+        this.sid = data.preload.albumsid
+        this.$apply()
+      }
+      this._albumDetail()
+      this._albumVideoList()
+    }
+    onRoute() {
+      this._albumDetail()
+      this._albumVideoList()
+    }
+    methods = {
+      addVideo() {
+        const arr = []
+        this.videoList.forEach((item, index) => {
+          arr.push(item.video.sid)
+        })
+        this.$preload('sidArr', arr);
+        this.$navigate({
+          url: '../../search?sid=' + this.sid
+        });
+      },
+      editFn() {
+        this.$redirect('../../addAlbum', {
+          flag: true,
+          sid: this.sid,
+          name: this.albumDetail.name,
+          thumb_bucket_sid: this.albumDetail.thumbBucketSid,
+          thumb_file_key: this.albumDetail.thumbFileKey,
+          description: this.albumDetail.description
+        });
+      },
+      removeVideo(e) {
+        const _this = this;
+        const ind = e.currentTarget.dataset.index
+        const videosid = e.currentTarget.dataset.videosid
+        _this.videoList.forEach((item, index) => {
+          if (index === ind) {
+            wx.showModal({
+              title: '提示',
+              content: '确定要删除该视频吗？',
+              success(res) {
+                if (res.confirm) {
+                  Service.$album.albumRemoveVideo({
+                    sid: _this.sid,
+                    video_sid: videosid
+                  }).then(res => {
+                    _this.$invoke('toast', 'show', {
+                      content: '删除成功',
+                      position: 'center'
+                    });
+                    _this._albumVideoList()
+                  })
+                }
+              }
+            })
+          }
+        })
+      }
+    }
+    onReachBottom() {
+      if (this.totalCount <= this.page * 10) {
+        return;
+      }
+      this.page++;
+      this.$apply();
+      this._albumVideoList();
+    }
+    onPullDownRefresh() {
+      this.page = 1;
+      this.$apply()
+      this._albumVideoList().then(() => {
+        wx.stopPullDownRefresh();
+      })
+    }
+    _albumDetail() {
+      Service.$album.albumDetail(this.sid).then(res => {
+        Utils.$file.getUrl({
+          sid: res.data.thumbBucketSid,
+          fileKey: res.data.thumbFileKey
+        }).then(url => {
+          res.data.thumbFileKeyUrl = url
+          this.albumDetail = res.data
+          this.$apply()
+        })
+      })
+    }
+    _albumVideoList() {
+      return Service.$album.albumVideoList({
+        sid: this.sid,
+        page: this.page,
+        limit: 10,
+        user_sid: Global.$data.currentUser.userSid
+      }).then(res => {
+        this.totalCount = res.data.totalCount;
+        if (!res.data.items || res.data.items.length === 0) {
+          this.videoList = [];
+          this.$apply()
+          return;
+        }
+        this._getUrl(res.data.items).then(res => {
+          if (this.page === 1) {
+            this.videoList = res
+          } else {
+            this.videoList = this.videoList.concat(res);
+          }
+          this.$apply();
+          return Promise.resolve(res);
+        })
+      })
+    }
+    _getUrl(arr) {
+      const formatData = arr.map((item, index) => {
+        item.video.publishTime = Utils.$formatDate.timestampToTime(item.video.publishTime)
+        Utils.$file.getUrl({
+          sid: item.video.thumbBucketSid,
+          fileKey: item.video.thumbFileKey
+        }).then(url => {
+          item.video.thumbFileKeyUrl = url;
+          this.$apply()
+        })
+        return item;
+      })
+      return Promise.resolve(formatData)
+    }
+  };
+</script>
+
+<style lang='less'>
+  .detail-page {
+    width: 100%;
+    height: 100%;
+    .pic {
+      height: 422rpx;
+      position: relative;
+      image {
+        width: 100%;
+        height: 100%;
+      }
+      .word {
+        width: 686rpx;
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        top: 80rpx;
+        left: 32rpx;
+        .title {
+          font-size: 60rpx;
+          color: #ffffff;
+        }
+        .intro {
+          font-size: 26rpx;
+          color: rgba(255, 255, 255, .8);
+          margin-top: 32rpx;
+        }
+        .edit {
+          width: 120rpx;
+          height: 48rpx;
+          line-height: 48rpx;
+          text-align: center;
+          background: #eb445a;
+          border-radius: 8rpx;
+          font-size: 26rpx;
+          color: #ffffff;
+          margin-top: 52rpx;
+        }
+      }
+    }
+    .box {
+      border-radius: 20rpx 20rpx 0 0;
+      .operation {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 32rpx;
+        margin-top: 40rpx;
+        .btn {
+          width: 188rpx;
+          height: 60rpx;
+          background: #eb445a;
+          font-size: 30rpx;
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 8rpx;
+          image {
+            width: 20rpx;
+            height: 20rpx;
+            margin-right: 12rpx;
+          }
+        }
+        text {
+          font-size: 30rpx;
+          color: #b3b3c1;
+        }
+      }
+      .container {
+        padding: 26rpx 32rpx;
+        position: relative;
+        .container-item {
+          display: flex;
+          align-items: center;
+          margin: 26rpx 0;
+          .fm {
+            width: 256rpx;
+            height: 144rpx;
+            border-radius: 16rpx;
+          }
+          .des {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            margin-left: 20rpx;
+            font-size: 30rpx;
+            color: #b3b3c1;
+            .time {
+              display: flex;
+              justify-content: space-between;
+              margin-top: 24rpx;
+              color: #6f727d;
+              font-size: 26rpx;
+              .remove {
+                width: 24rpx;
+                height: 26rpx;
+              }
+              .combined {
+                width: 52rpx;
+                height: 22rpx;
+              }
+            }
+          }
+        }
+        .mainmove {
+          position: absolute;
+          opacity: 0.7
+        }
+        .maind {
+          background: #fff;
+          border: 1px dashed #efefef;
+        }
+        .mainend {
+          position: static;
+          opacity: 1;
+        }
+      }
+    }
+  }
+  .row {
+    height: 47px;
+    width: 100%;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+  }
+  .title-row {
+    border-bottom: 1px solid #888888;
+    color: #888888;
+  }
+  .list-row {
+    padding: 8px 0px;
+    border-bottom: 1px solid #D9D9D9;
+    background-color: white;
+  }
+  .movable-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    width: 100%;
+  }
+  .movable-row {
+    box-shadow: #D9D9D9 0px 0px 20px;
+  }
+  .ready-place {
+    background-color: #CCCCCC
+  }
+  .content {
+    font-size: 17px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+</style>

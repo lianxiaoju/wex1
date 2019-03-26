@@ -1,0 +1,309 @@
+<template>
+  <view class='album-page'>
+    <view class="pic">
+      <image src="{{picture}}" />
+      <view class="add" @tap="joinPicture">
+        <image src="../images/pic.png" />
+        <text wx:if="{{!isShowPic}}">点击添加封面</text>
+        <text style="color: #ffffff;" wx:if="{{isShowPic}}">点击更换封面</text>
+      </view>
+    </view>
+    <view class="title">
+      <input @input="getName" value="{{name}}" placeholder-style="color: rgba(179, 179, 193, 0.4);" placeholder="请输入专辑标题" />
+    </view>
+    <view class="intro">
+      <textarea @input="getDescription" value="{{description}}" maxlength="50" placeholder-style="color: rgba(179, 179, 193, 0.4);" placeholder="请输入一段专辑的介绍，不超过50个字哦～" />
+    </view>
+    <view class="open" wx-if="{{!isOnline}}">
+      <text>立即上线</text>
+      <view @tap="clickFn">
+        <image wx:if="{{!isShow}}" src="../images/close2.png" />
+        <image wx:if="{{isShow}}" src="../images/open.png" />
+      </view>
+    </view>
+    <button @tap="saveFn" class="save-btn">保存</button>
+    <loading/>
+    <toast/>
+    <dialog/>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy';
+  import Utils from '../common/util';
+  import Services from '../common/services';
+  import UILoading from '../components/ui-loading';
+  import UIToast from '../components/ui-toast';
+  import UIDialog from '../components/ui-dialog';
+  export default class Album extends wepy.page {
+    config = {
+      enablePullDownRefresh: false,
+    };
+    components = {
+      'loading': UILoading,
+      'toast': UIToast,
+      'dialog': UIDialog
+    }
+    components = {
+      'loading': UILoading,
+      'toast': UIToast,
+      'dialog': UIDialog
+    }
+    data = {
+      picture: '',
+      isShow: false,
+      isShowPic: false,
+      bucket_sid: '',
+      file_key: '',
+      name: '',
+      description: '',
+      isOnline: false,
+      option: {}
+    };
+    onLoad(option, data) {
+      this.option = option;
+      if (option.name) {
+        this.isOnline = true;
+        this.$apply()
+        Utils.$file.getUrl({
+          sid: option.thumb_bucket_sid,
+          fileKey: option.thumb_file_key
+        }).then(url => {
+          this.picture = url;
+          this.bucket_sid = option.thumb_bucket_sid;
+          this.file_key = option.thumb_file_key;
+          this.isShowPic = true;
+          this.name = option.name;
+          this.description = option.description;
+          this.$apply()
+        })
+      }
+      if (option.src) {
+        if (data.preload.option.name) {
+          this.isOnline = true;
+          this.$apply()
+        }
+        this.option = data.preload.option
+        this.bucket_sid = data.preload.option.thumb_bucket_sid;
+        this.file_key = data.preload.option.thumb_file_key;
+        this.name = data.preload.option.name;
+        this.description = data.preload.option.description;
+        this.isShowPic = true;
+        this.$apply()
+        this._getUploadToken(option.src)
+      }
+    }
+    methods = {
+      getName(e) {
+        this.name = e.detail.value;
+        this.$apply()
+      },
+      getDescription(e) {
+        this.description = e.detail.value;
+        this.$apply()
+      },
+      joinPicture() {
+        const _this = this;
+        wx.showActionSheet({
+          itemList: ['从相册中选择', '拍照'],
+          success: function(res) {
+            if (!res.cancel) {
+              if (res.tapIndex == 0) {
+                _this._chooseWxImage('album');
+              } else if (res.tapIndex == 1) {
+                _this._chooseWxImage('camera');
+              }
+            }
+          }
+        })
+      },
+      clickFn() {
+        if (this.isShow) {
+          this.isShow = false
+          this.$apply()
+        } else {
+          this.isShow = true
+          this.$apply()
+        }
+      },
+      saveFn() {
+        const _this = this
+        if (_this.name === '') {
+          _this.$invoke('toast', 'show', {
+            content: '专辑名不能为空',
+            position: 'center'
+          });
+        } else if (_this.description === '') {
+          _this.$invoke('toast', 'show', {
+            content: '专辑介绍不能为空',
+            position: 'center'
+          });
+        } else {
+          if (_this.option.flag) {
+            Services.$album.updateAlbum({
+              sid: _this.option.sid,
+              name: _this.name,
+              thumb_bucket_sid: _this.bucket_sid,
+              thumb_file_key: _this.file_key,
+              description: _this.description
+            }).then(res => {
+              _this.$invoke('toast', 'show', {
+                content: '修改专辑成功',
+                position: 'center'
+              });
+              _this.$preload('albumsid', _this.option.sid);
+              _this.$redirect({
+                url: '../../album-detail'
+              })
+            })
+          } else {
+            Services.$album.createAlbum({
+              name: _this.name,
+              thumb_bucket_sid: _this.bucket_sid,
+              thumb_file_key: _this.file_key,
+              description: _this.description
+            }).then(res => {
+              _this.$invoke('toast', 'show', {
+                content: '新建专辑成功',
+                position: 'center'
+              });
+              _this.$redirect({
+                url: '../../user?albumsid=' + res.data.albumSid + '&flag=' + _this.isShow
+              })
+            })
+          }
+        }
+      }
+    }
+    _chooseWxImage(type) {
+      const _this = this;
+      wx.chooseImage({
+        count: 1,
+        sizeType: ["original", "compressed"],
+        sourceType: [type],
+        success: function(res) {
+          _this.$preload('option', _this.option);
+          _this.$redirect({
+            url: '../../cropper?src=' + res.tempFilePaths[0]
+          })
+        }
+      })
+    }
+    _getUploadToken(file) {
+      const _this = this
+      Utils.$file.getUploadOps('album.thumb').then(res => {
+        _this.bucket_sid = res.bucket.sid;
+        _this.file_key = res.fileKey
+        _this.$apply()
+        wx.uploadFile({
+          url: 'https://upload.qiniup.com/',
+          filePath: file,
+          name: 'file',
+          formData: {
+            'token': res.uploadToken,
+            'key': res.fileKey
+          },
+          success(data) {
+            _this.picture = file
+            _this.isShowPic = true
+            _this.$apply()
+          }
+        })
+      }).catch(err => {
+        console.error(err);
+      });
+    }
+  }
+</script>
+
+<style lang='less'>
+  .album-page {
+    padding: 0 32rpx;
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    >view {
+      margin: 16rpx 0;
+    }
+    .pic {
+      height: 386rpx;
+      margin-top: 16rpx;
+      border-radius: 16rpx;
+      background: #17202b;
+      >image {
+        width: 686rpx;
+        height: 386rpx;
+        position: relative;
+      }
+      .add {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        position: absolute;
+        top: 134rpx;
+        left: 296rpx;
+        >image {
+          width: 78rpx;
+          height: 78rpx;
+        }
+        text {
+          color: #eb445a;
+          font-size: 26rpx;
+          margin-top: 16rpx;
+        }
+      }
+    }
+    .title,
+    .intro {
+      input,
+      textarea {
+        height: 98rpx;
+        background: #17202c;
+        padding: 0 24rpx;
+        border-radius: 8rpx;
+        white-space: wrap;
+        text-overflow: initial;
+        overflow: initial;
+        font-size: 30rpx;
+        color: #b3b3c1;
+      }
+    }
+    .intro textarea {
+      width: 638rpx;
+      padding: 34rpx 24rpx;
+      min-height: 240rpx;
+    }
+    .open {
+      height: 98rpx;
+      line-height: 98rpx;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #17202c;
+      font-size: 30rpx;
+      color: #b3b3c1;
+      padding: 0 24rpx;
+      view {
+        width: 60rpx;
+        height: 40rpx;
+        line-height: 40rpx;
+        image {
+          width: 60rpx;
+          height: 40rpx;
+        }
+      }
+    }
+    .save-btn {
+      width: 350rpx;
+      height: 98rpx;
+      line-height: 98rpx;
+      text-align: center;
+      font-size: 30rpx;
+      color: #ffffff;
+      background: #eb445a;
+      border-radius: 8rpx;
+      margin-top: 80rpx;
+    }
+  }
+</style>

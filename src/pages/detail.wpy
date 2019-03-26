@@ -1,0 +1,701 @@
+<template>
+  <view class="part">
+    <view class="top_con">
+      <view hidden="{{isVideoHidden}}">
+        <video id="video" class="fm_pic" autoplay src="{{video.videoFile.web.videoFileKeyUrl}}" />
+        <view class="file">
+          <text>{{video.videoFile.web.zhsubtitle_file_key}}</text>
+          <text class="en">{{video.videoFile.web.ensubtitle_file_key}}</text>
+        </view>
+      </view>
+      <view hidden="{{!isVideoHidden}}" class="fm">
+        <image src="{{video.thumbFileKeyUrl}}" />
+        <image class="play" @tap.stop="playFn" src="../images/play.png" />
+        <view class="count">
+          <text>{{video.viewCount}}</text><text class="text">次播放</text>
+          <text>{{video.videoFile.web.duration}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="commentBox" hidden="{{!isCommentFlag}}" @tap.stop="blurFn">
+      <view class="tit">
+        <text wx:if="{{totalCount !== 0}}">评论{{totalCount}}条</text>
+        <text wx:if="{{totalCount === 0}}">暂无评论</text>
+        <image @tap.stop="closeFn" src="../images/close.png" />
+      </view>
+      <view>
+        <view class="no-comment" wx:if="{{totalCount === 0}}">
+          <image src="../images/no-comment.png" />
+          <view class="comment-ipt" wx:if="{{!isClass}}" @tap.stop="focusFn">
+            <text>So，你怎么看？一起来评论吧</text>
+          </view>
+          <view class="comment-ipt" wx:if="{{isClass}}" @tap.stop="focusFn">
+            <input confirm-hold @input="iptVal" @confirm="sendFn" @blur="blurFn" value="{{ipt}}" />
+            <button wx:if="{{isClass}}" @tap.stop="sendFn">发布</button>
+          </view>
+        </view>
+        <view class="commentItem" wx:for="{{commentList}}" wx:key="{{index}}">
+          <view class="comment-info">
+            <image src="{{item.avatarFileKeyUrl}}" />
+            <view class="userinfo">
+              <text>{{item.nickname}}</text>
+              <text class="time">{{item.createTime}}</text>
+            </view>
+          </view>
+          <view class="comment-con">
+            <text>{{item.content}}</text>
+            <view class="comment-surplus" wx:if="{{item.replies.length !== 0}}">
+              <view class="comment-reply">
+                <view wx:for="{{item.replies.length > 2 ? item.replies.splice(0, 2) : item.replies}}"  wx:for-item="item1" wx:key="{{index}}">
+                  <text>{{item1.nickname}}</text>
+                  <text class="reply-con">{{item1.content}}</text>
+                </view>
+              </view>
+              <view class="surplus" @tap.stop="allReplyFn" data-item="{{item}}" wx:if="{{item.replyCount >= 2}}">
+                <text>查看全部{{item.replyCount}}条回复</text>
+                <image src="../images/enter.png" />
+              </view>
+            </view>
+            <view class="cz">
+              <view @tap.stop="replyFn" data-sid="{{item.sid}}">
+                <image src="../images/comment.png" />
+                <text>{{item.replyCount}}</text>
+              </view>
+              <view @tap.stop="islikedFn" data-sid="{{item.sid}}">
+                <image wx:if="{{item.isLiked}}" src="../images/zan.png" />
+                <image wx:if="{{!item.isLiked}}" src="../images/wz.png" />
+                <text>{{item.likeCount}}</text>
+              </view>
+            </view>
+          </view>
+          <view class="comment-ipt" wx:if="{{!isClass}}" @tap.stop="focusFn">
+            <text>So，你怎么看？一起来评论吧</text>
+          </view>
+          <view class="comment-ipt" wx:if="{{isClass}}" @tap.stop="focusFn">
+            <input confirm-hold @confirm="sendFn" @input="iptVal" @blur="blurFn" value="{{ipt}}" />
+            <button @tap.stop="sendFn">发布</button>
+          </view>
+        </view>
+      </view>
+      
+    </view>
+    <view class="bottom_con">
+      <view class="message">
+        <image class="pic" src="{{video.topic.iconFileKeyUrl}}" />
+        <text class="nickename">{{video.topic.name}}</text>
+        <view @tap.stop="addFn" data-sid="{{video.topic.sid}}" class="add-up" wx:if="{{video.topic.isFollowed !== 1}}"><image src="../images/add-up.png" /><text>关注</text></view>
+      </view>
+      <text class="title ellipsis">{{video.zhName}}</text>
+      <view class="operation">
+        <view @tap.stop="commentFn">
+          <image src="../images/comment.png" />
+          <text>{{video.commentCount}}</text>
+        </view>
+        <view @tap.stop="likeFn" data-sid="{{video.videoFile.web.videoSid}}">
+          <image wx:if="{{video.isLiked === 0}}" src="../images/unlike.png" />
+          <image wx:if="{{video.isLiked === 2}}" src="../images/unlike.png" />
+          <image wx:if="{{video.isLiked === 1}}" src="../images/like.png" />
+          <text>{{video.likeCount}}</text>
+        </view>
+        <view @tap.stop="shareFn">
+          <image src="../images/share.png" />
+          <text>{{video.shareCount}}</text>
+        </view>
+      </view>
+      <view class="comment-list" wx:if="{{video.commentCount != 0}}">
+        <image src="../images/line.png" />
+        <text>{{commentList[0].content}}</text>
+      </view>
+    </view>
+    <view class="dialog" wx:if="{{isShow}}">
+      <view @tap.stop="ontapShareBtn">
+        <image src="../images/picture.png" />
+        <text>生成分享海报</text>
+        <canvas class="canvas" style="width: 750px; height: 1334px;" canvas-id="share_canvas" />
+        <canvas class="canvas" style="width: 75px; height: 75px;" canvas-id="myQrcode"></canvas>
+      </view>
+      <view wx:if="{{shareBtn}}" @tap.stop="friendsFn">
+        <button open-type="share">
+          <image src="../images/wx.png" />
+          <text>分享给微信好友</text>
+        </button>
+      </view>
+      <view wx:if="{{!shareBtn}}" @tap.stop="friendsFn">
+        <button>
+          <image src="../images/wx.png" />
+          <text>分享给微信好友</text>
+        </button>
+      </view>
+    </view>
+    <view class="recommend">
+      <view class="tit">相关推荐</view>
+      <view class="recommend-part">
+        <view class="part-item" wx:for="{{recommendList}}" wx:key="{{index}}" @tap.stop="recommendFn" data-videosid="{{item.videoFile.web.videoSid}}" data-sid="{{item.sid}}">
+          <view>
+            <image src="{{item.thumbFileKeyUrl}}" />
+            <view class="count">
+              <text>{{item.viewCount}}</text><text class="text">次播放</text>
+              <text>{{item.videoFile.web.duration}}</text>
+            </view>
+          </view>
+          <view class="ellipsis">{{item.zhName}}</view>
+        </view>
+      </view>
+    </view>
+    <view hidden="{{!isHidden}}" class="share-mask" @tap.stop="ontapShareMask">
+      <image mode="widthFix" @tap.stop="ontapSharePoster" class="share-poster" src="{{sharePoster}}" />
+    </view>
+    <loading/>
+    <toast/>
+    <dialog/>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import Service from '../common/services'
+  import Util from '@hzct/js-utils'
+  import Utils from '../common/util'
+  import formatSeconds from '../common/util/formatSeconds.js'
+  import Global from '../common/global.js'
+  import UILoading from '../components/ui-loading';
+  import UIToast from '../components/ui-toast';
+  import UIDialog from '../components/ui-dialog';
+  import PosterConfig from '../common/util/poster-config.js';
+  import Canvas from '../common/util/canvas.js';
+  import drawQrcode from 'weapp-qrcode'
+  const sharePosterConfig = new PosterConfig();
+  const poster = {};
+
+  export default class Index extends wepy.page {
+    components = {
+      'loading': UILoading,
+      'toast': UIToast,
+      'dialog': UIDialog
+    }
+    data = {
+      sid: '',
+      isShow: false,
+      video: {},
+      recommendList: [],
+      isHidden: false,
+      page: 1,
+      sharePoster: '',
+      isVideoHidden: false,
+      isCommentFlag: false,
+      commentList: [],
+      videoSid: '',
+      totalCount: 0,
+      replyTotalCount: 0,
+      isClass: false,
+      isReply: false,
+      ipt: '',
+      replySid: '',
+      shareBtn: false,
+      share: ''
+    }
+    onShow() {
+      if (Util.$$storage.getItem('_g_currentUser')) {
+        this.shareBtn = true
+        this.$apply()
+      } else {
+        this.shareBtn = false
+        this.$apply()
+      }
+    }
+    onShareAppMessage(options) {
+      const shareObj = {
+        title: this.video.zhName,
+        path: '/pages/home?video_sid=' + this.video.sid,
+        imageUrl: 'https:' + this.video.thumbFileKeyUrl
+      }
+      return shareObj;
+    }
+    onLoad(option) {
+      this.sid = option.sid
+      this.$apply()
+      this.$invoke('loading', 'show', 'Loading');
+      this._getDetailList().then(() => {
+        if (Util.$$storage.getItem('isLiked'+ this.sid) || Util.$$storage.getItem('likeCount'+ this.sid)) {
+          Util.$$storage.setItem('isLiked' + this.sid, this.video.isLiked);
+          Util.$$storage.setItem('likeCount' + this.sid, this.video.likeCount);
+        }
+        if (Util.$$storage.getItem('isFollowed'+ this.sid)) {
+          Util.$$storage.setItem('isFollowed' + this.sid, this.video.topic.isFollowed);
+        }
+      })
+      this._getRecommendList()
+      this._getCommentList()
+      if (option.flag) {
+        this.isCommentFlag = true
+        this.$apply()
+        this._getCommentList()
+      }
+    }
+    onRoute() {
+      this._getCommentList()
+    }
+    methods = {
+      iptVal(e) {
+        this.ipt = e.detail.value;
+        this.$apply()
+      },
+      shareFn() {
+        if (this.isShow) {
+          this.isShow = false
+        } else {
+          this.isShow = true
+        }
+        this.$apply()
+      },
+      recommendFn(e) {
+        const sid = e.currentTarget.dataset.sid
+        const videoSid = e.currentTarget.dataset.videosid;
+        this.$redirect({
+          url: '../../detail?sid=' + sid
+        })
+        this._getCommentList()
+      },
+      commentFn() {
+        if (!Util.$$storage.getItem('_g_currentUser')) {
+          this.$navigate({
+            url: '../../login'
+          });
+          return;
+        }
+        this.isCommentFlag = true
+        this.$apply()
+        this._getCommentList()
+      },
+      likeFn(e) {
+        if (!Util.$$storage.getItem('_g_currentUser')) {
+          this.$navigate({
+            url: '../../login'
+          });
+          return;
+        }
+        const sid = e.currentTarget.dataset.sid;
+        if (this.video.isLiked === 0 || this.video.isLiked === 2) {
+          Service.$info.videoLike(sid).then(() => {
+            this.video.isLiked = 1
+            this.video.likeCount = this.video.likeCount * 1 + 1
+            this.$apply()
+            this.$invoke('toast', 'show', {
+              content: '点赞成功',
+              position: 'center'
+            });
+            Util.$$storage.setItem('isLiked' + this.sid, this.video.isLiked);
+            Util.$$storage.setItem('likeCount' + this.sid, this.video.likeCount);
+          })
+        } else if (this.video.isLiked === 1) {
+          Service.$info.videoUnlike(sid).then(() => {
+            this.video.isLiked = 2
+            this.video.likeCount = (this.video.likeCount * 1 - 1 < 0) ? 0 : (this.video.likeCount * 1 - 1)
+            this.$apply()
+            this.$invoke('toast', 'show', {
+              content: '取消点赞成功',
+              position: 'center'
+            });
+            Util.$$storage.setItem('isLiked' + this.sid, this.video.isLiked);
+            Util.$$storage.setItem('likeCount' + this.sid, this.video.likeCount);
+          })
+        }
+      },
+      addFn(e) {
+        if (!Util.$$storage.getItem('_g_currentUser')) {
+          this.$navigate({
+            url: '../../login'
+          });
+          return;
+        }
+        const sid = e.currentTarget.dataset.sid;
+        if (this.video.topic.isFollowed === 0 || this.video.topic.isFollowed === 2) {
+          Service.$info.likeupmaster(sid).then(() => {
+            this.video.topic.isFollowed = 1
+            this.$apply()
+            this.$invoke('toast', 'show', {
+              content: '关注成功',
+              position: 'center'
+            });
+            Util.$$storage.setItem('isFollowed' + this.sid, this.video.topic.isFollowed);
+          })
+        } else if (this.video.topic.isFollowed === 1) {
+          Service.$info.unlikeupmaster(sid).then(() => {
+            this.video.topic.isFollowed = 2
+            this.$apply()
+            this.$invoke('toast', 'show', {
+              content: '取消关注成功',
+              position: 'center'
+            });
+            Util.$$storage.setItem('isFollowed' + this.sid, this.video.topic.isFollowed);
+          })
+        }
+      },
+      allReplyFn(e) {
+        const item = e.currentTarget.dataset.item;
+        this.$navigate('../../reply', item)
+      },
+      replyFn(e) {
+        const sid = e.currentTarget.dataset.sid;
+        this.replySid = sid;
+        this.isReply = true;
+        this.isClass = true;
+        this.$apply()
+      },
+      islikedFn(e) {
+        const sid = e.currentTarget.dataset.sid;
+        this.commentList.forEach((item, index) => {
+          if (item.sid === sid) {
+            if (!item.isLiked) {
+              Service.$info.commentLiked({
+                comment_sid: sid
+              }).then(() => {
+                item.isLiked = true
+                item.likeCount = item.likeCount * 1 + 1
+                this.$apply()
+              })
+            } else {
+              Service.$info.commentUnlLiked({
+                comment_sid: sid
+              }).then(() => {
+                item.isLiked = false
+                item.likeCount = item.likeCount * 1 - 1
+                this.$apply()
+              })
+            }
+          }
+        })
+      },
+      ontapShareBtn() {
+        if (!Util.$$storage.getItem('_g_currentUser')) {
+          this.$navigate({
+            url: '../../login'
+          });
+          return;
+        }
+        this.isVideoHidden = true;
+        const videoContext = wx.createVideoContext('video');
+        videoContext.pause();
+        this.$apply()
+        this.$invoke('toast', 'show', {
+          content: '海报生成中',
+          position: 'bottom'
+        });
+        this._sharePoster();
+      },
+      friendsFn() {
+        if (!Util.$$storage.getItem('_g_currentUser')) {
+          this.$navigate({
+            url: '../../login'
+          });
+          return;
+        } else {
+          this.shareBtn = true
+          this.$apply()
+        }
+      },
+      playFn() {
+        const videoContext = wx.createVideoContext('video');
+        videoContext.play();
+        this.isVideoHidden = false;
+        this.$apply()
+      },
+      ontapShareMask() {
+        this.isHidden = false;
+        this.$apply()
+      },
+      ontapSharePoster() {
+        wx.previewImage({
+          current: poster.url,
+          urls: [poster.url],
+          success: () => {
+            this.isHidden = false;
+            this.$apply()
+          }
+        });
+      },
+      closeFn() {
+        this.isCommentFlag = false
+        this._getCommentList()
+        this._getDetailList()
+        this.$apply()
+      },
+      focusFn() {
+        this.isClass = true
+        this.$apply()
+      },
+      blurFn() {
+        this.isClass = false
+        this.$apply()
+      },
+      sendFn() {
+        if (this.ipt === '' ) {
+          this.$invoke('toast', 'show', {
+            content: '评论内容不能为空',
+            position: 'center'
+          });
+          return;
+        }
+        if (this.isReply) {
+          Service.$info.replyComment({
+            comment_sid: this.replySid,
+            content: this.ipt,
+            to_reply_sid: ''
+          }).then(res => {
+            this.ipt = ''
+            this.isClass = false
+            this.isReply = false
+            this.$apply()
+            this._getCommentList()
+          })
+        } else {
+          Service.$info.commentVideo({
+            video_sid: this.sid,
+            content: this.ipt
+          }).then(res => {
+            this.ipt = ''
+            this.isClass = false
+            this.$apply()
+            this._getCommentList()
+          })
+        }
+      }
+    }
+    onReachBottom() {
+      this.page++;
+      this.$apply();
+      this._getRecommendList();
+    }
+    onPullDownRefresh() {
+      this._getCommentList()
+      this._getRecommendList().then((res) => {
+        wx.stopPullDownRefresh();
+      })
+    }
+    _draw(videoSid) {
+      return new Promise((resolve) => {
+        drawQrcode({
+          width: 75,
+          height: 75,
+          canvasId: 'myQrcode',
+          typeNumber: -1,
+          text: 'https://wx.kanshijie.com/mini/qrcode.html?action=video.shared&video_sid=' + videoSid
+        })
+        wx.canvasToTempFilePath({
+          x: 0,
+          y: 0,
+          width: 75,
+          height: 75,
+          destWidth: 225,
+          destHeight: 225,
+          fileType: 'jpg',
+          quality: 1,
+          canvasId: 'myQrcode',
+          success(res) {
+            resolve(res)
+          },
+          fail(e) {
+            console.error('生成图片或返回文件路径错误');
+            reject(e);
+          }
+        });
+      })
+    }
+    _getDetailList() {
+      return Service.$home.getDetailList(this.sid).then(res => {
+        if (res.data.isLiked === 1) {
+          res.data.likeCount = res.data.likeCount + 1
+          this.$apply()
+        }
+        Promise.all([
+          Utils.$file.getUrl({
+            sid: res.data.thumbBucketSid,
+            fileKey: res.data.thumbFileKey
+          }).then(url => {
+            res.data.thumbFileKeyUrl = url
+          }),
+          Utils.$file.getUrl({
+            sid: res.data.topic.iconBucketSid,
+            fileKey: res.data.topic.iconFileKey
+          }).then(url => {
+            res.data.topic.iconFileKeyUrl = url
+            this.$apply()
+          }),
+          Utils.$file.getUrl({
+            sid: res.data.videoFile.web.videoBucketSid,
+            fileKey: res.data.videoFile.web.videoFileKey
+          }).then(url => {
+            res.data.videoFile.web.videoFileKeyUrl = url
+            this.$apply()
+          })
+        ]).then(() => {
+          this.video = res.data
+          this.$apply()
+          this.$invoke('loading', 'hide');
+          return Promise.resolve(res);
+        })
+      })
+    }
+    _getRecommendList() {
+      return Service.$home.getRecommendList({
+        page: this.page,
+        limit: 10,
+        channel_sid: "",
+        scene_id: "detailrelatedRecommend",
+        log_id: Util.$$encrypt.guid(),
+        video_sid: this.sid
+      }).then(res => {
+        if(!res.data.items || res.data.items.length === 0) {
+          return;
+        }
+        this._getUrl(res.data.items).then(res => {
+          if (this.page === 1) {
+            this.recommendList = res
+          } else {
+            this.recommendList = this.recommendList.concat(res);
+          }
+          this.$apply();
+          this.$invoke('loading', 'hide');
+          return Promise.resolve(res);
+        })
+      })
+    }
+    _getUrl(arr) {
+      const formatData = arr.map((item, index) => {
+        if (item.isLiked === 1) {
+          item.likeCount = item.likeCount * 1 + 1
+        }
+        const videoFile = item.videoFile.web || item.videoFile['360p'];
+        videoFile.duration = formatSeconds(videoFile.duration);
+        Utils.$file.getUrl({
+          sid: item.thumbBucketSid,
+          fileKey: item.thumbFileKey
+        }).then(url => {
+          item.thumbFileKeyUrl = url;
+        })
+        Utils.$file.getUrl({
+          sid: item.iconBucketSid,
+          fileKey: item.iconFileKey
+        }).then(url => {
+          item.iconFileKeyUrl = url
+        })
+        Utils.$file.getUrl({
+          sid: videoFile.videoBucketSid,
+          fileKey: videoFile.videoFileKey
+        }).then(url => {
+          videoFile.videoFileKeyUrl = url;
+          this.$apply()
+        })
+        return item;
+      })
+      return Promise.resolve(formatData)
+    }
+    _saveImage() {
+      wx.saveImageToPhotosAlbum({
+        filePath: poster.url,
+        success: () => {
+          this.$apply();
+          this.$invoke('toast', 'show', {
+            content: '已保存到相册，点击当前海报可直接进行分享',
+            position: 'bottom'
+          });
+        },
+        fail: () => {
+          this.$invoke('toast', 'show', {
+            content: '保存失败',
+            position: 'bottom'
+          });
+        }
+      });
+    }
+    _sharePoster() {
+      const _this = this;
+      if (!_this.video.thumbFileKeyUrl) {
+        _this.$invoke('toast', 'show', '本文不支持海报分享');
+        return;
+      }
+      wx.getImageInfo({
+        src: 'https:' + _this.video.thumbFileKeyUrl,
+        success: (res) => {
+          _this.$invoke('loading', 'show', '海报生成中');
+          const shareImgInfo = {
+            url: 'https:' + _this.video.thumbFileKeyUrl,
+            width: res.width,
+            height: res.height
+          };
+          _this._draw(_this.video.sid).then(res => {
+            sharePosterConfig.setConfigs(_this.video.zhName, shareImgInfo, res.tempFilePath);
+            _this._drawPoster();
+            poster.hasTapedShare = true;
+            _this._showPoster();
+          })
+        },
+        fail: (err) => {
+          console.error(err)
+        }
+      })
+    }
+    _drawPoster() {
+      poster.isDrawing = true;
+      Canvas.drawPoster(sharePosterConfig.config).then(res => {
+        poster.isDrawing = false;
+        const url = res;
+        if (url) {
+          poster.url = url;
+          this._showPoster();
+        }
+      })
+    }
+    _showPoster() {
+      if (poster.isDrawing || !poster.hasTapedShare) {
+        return;
+      }
+      this.$invoke('loading', 'hide');
+      if (!poster.url) {
+        this.$invoke('toast', 'show', '分享海报生成失败');
+      } else {
+        this.sharePoster = poster.url;
+        this.$apply()
+        this.isHidden = true;
+        this.$apply()
+      }
+      poster.isDrawing = false;
+      poster.hasTapedShare = false;
+      this.$invoke('toast', 'show', {
+        content: '正在保存中',
+        position: 'bottom'
+      });
+      this._saveImage();
+    }
+    _getCommentList() {
+      Service.$info.getCommentList({
+        video_sid: this.sid
+      }).then(res => {
+        this.totalCount = res.data.totalCount
+        this.$apply()
+        if(!res.data.items || res.data.items.length === 0) {
+          return;
+        }
+        res.data.items.forEach((item, index) => {
+          item.createTime = Utils.$formatDate.formatZHDate(item.createTime);
+          if (item.isLiked) {
+            item.likeCount = item.likeCount * 1 + 1
+          }
+          Utils.$file.getUrl({
+            sid: item.avatarBucketSid,
+            fileKey: item.avatarFileKey
+          }).then(url => {
+            item.avatarFileKeyUrl = url
+            this.$apply()
+          })
+        })
+        this.commentList = res.data.items
+        this.$apply()
+      })
+    }
+  }
+</script>
+
+<style lang="less">
+  @import url("../style/style.less");
+</style>

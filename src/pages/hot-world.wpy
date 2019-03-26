@@ -1,0 +1,50 @@
+<template>
+  <view class='hot-world'>
+    <view class="banner">
+      <image src="../images/bg3.png" />
+      <view class="title">
+        <text>今日世界正流行</text>
+        <text class="intro">为你发现全球最潮生活，探索世界当下最流行的生活方式，时刻关注世界最热门话题。</text>
+      </view>
+    </view>
+    <view>
+      <image src="../images/Today.png" />
+    </view>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy';
+  export default class Example extends wepy.page {
+    data = {};
+    components = {};
+    methods = {};
+    onLoad() {};
+  }
+</script>
+
+<style lang='less'>
+.hot-world {
+  .banner {
+    image {
+      width: 100%;
+      height: 380rpx;
+      position: relative;
+    }
+    .title {
+      display: flex;
+      flex-direction: column;
+      font-size: 60rpx;
+      color: #ffffff;
+      position: absolute;
+      top: 132rpx;
+      left: 32rpx;
+      .intro {
+        font-size: 26rpx;
+        line-height: 36rpx;
+        margin-top: 32rpx;
+      }
+    }
+  }
+}
+</style>

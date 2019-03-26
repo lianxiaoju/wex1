@@ -1,0 +1,1077 @@
+<template>
+  <view class="home-page">
+    <view class="tab-bar">
+      <view class="tabBar-item {{ind === -2 ? 'addClass' : ''}}" @tap="recommendFn">推荐<text class="bar"></text></view>
+      <view class="tabBar-item {{ind === -1 ? 'addClass' : ''}}" @tap="attentionFn">关注<text class="bar"></text></view>
+      <image wx:if="{{isUser}}" @tap.stop="userFn" src="../images/user.png" />
+    </view>
+    <view class="container">
+      <scroll-view scroll-x scroll-with-animation class="topic-box" wx:if="{{ind === -1}}">
+        <view class="img">
+          <image class="picture" @tap="addAttention" src="../images/add-attention.png" />
+        </view>
+        <view class="img" wx:for="{{arrTopic}}" @tap="topicDetail" data-sid="{{item.sid}}" wx:key="{{index}}">
+          <image class="picture" src="{{item.iconFileKeyUrl}}" />
+        </view>
+      </scroll-view>
+      <view class="part" wx:for="{{arrData}}" wx:key="{{index}}">
+        <view class="hotworld" wx:if="{{index === 1 && ind=== -2}}">
+          <view class="hotworld-title">
+            <view>
+              <image class="hot-img" src="../images/hot.png" />
+              <text>今日世界正流行</text>
+            </view>
+            <view class="all" @tap="allFn">
+              <text>全部</text>
+              <image class="enter-img" src="../images/enter2.png" />
+            </view>
+          </view>
+          <scroll-view scroll-x="{{true}}" scroll-with-animation style="height: 360rpx">
+            <view class="hotworld-scroll">
+              <view class="world-item" wx:for="{{hotWorld}}" @tap="detailFn" data-sid="{{item.sid}}" data-videosid="{{item.videoFile.web.videoSid}}" wx:key="{{index}}">
+                <image class="hotworld-pic" src="{{item.thumbFileKeyUrl}}" />
+                <view class="hotworld-con ellipsis">
+                  <image class="hotworld-icon" src="{{item.badgeFileKeyUrl}}" />{{item.zhName}}
+                </view>
+              </view>
+            </view>
+          </scroll-view>
+        </view>
+        <view class="top_con">
+          <view class="fm" wx:if='{{playIndex !== index}}'>
+            <image src="{{item.thumbFileKeyUrl}}" />
+            <image class="play" data-index="{{index}}" wx:if='{{playIndex !== index}}' @tap.stop="playFn" src="../images/play.png" />
+            <view class="count">
+              <text>{{item.viewCount}}</text><text class="text">次播放</text>
+              <text>{{item.videoFile.web.duration}}</text>
+            </view>
+          </view>
+          <view wx:if="{{playIndex === index}}" data-index="{{index}}" style="width: 100%; height: 200px;">
+            <video id='video{{index}}' style="width: 100%; height: 200px; border-radius: 8px;" autoplay src="{{item.videoFile.web.videoFileKeyUrl}}"></video>
+          </view>
+        </view>
+        <view class="bottom_con" @tap="detailFn" data-sid="{{item.sid}}" data-videosid="{{item.videoFile.web.videoSid}}">
+          <view class="info">
+            <text class="title">{{item.zhName}}</text>
+            <image class="pic" src="{{item.topic.iconFileKeyUrl}}" />
+            <image @tap.stop="addFn" data-sid="{{item.topic.sid}}" wx:if="{{item.topic.isFollowed !== 1}}" class="add" src="../images/add.png" />
+          </view>
+          <view class="operation">
+            <view data-videosid="{{item.videoFile.web.videoSid}}" data-sid="{{item.sid}}" @tap.stop="commentFn">
+              <image src="../images/comment.png" />
+              <text>{{item.commentCount}}</text>
+            </view>
+            <view @tap.stop="likeFn" data-sid="{{item.videoFile.web.videoSid}}">
+              <image wx:if="{{item.isLiked === 0}}" src="../images/unlike.png" />
+              <image wx:if="{{item.isLiked === 2}}" src="../images/unlike.png" />
+              <image wx:if="{{item.isLiked === 1}}" src="../images/like.png" />
+              <text>{{item.likeCount}}</text>
+            </view>
+            <view @tap.stop="shareFn" data-index="{{index}}">
+              <image class="share" src="../images/share.png" />
+            </view>
+          </view>
+        </view>
+        <view class="dialog" wx:if="{{item.isShow}}">
+          <view @tap.stop="ontapShareBtn">
+            <image src="../images/picture.png" />
+            <text>生成分享海报</text>
+            <canvas class="canvas" style="width: 750px; height: 1334px;" canvas-id="share_canvas" />
+            <canvas class="canvas" style="width: 75px; height: 75px;" canvas-id="myQrcode"></canvas>
+          </view>
+          <view wx:if="{{shareBtn}}" @tap.stop="friendsFn">
+            <button open-type="share">
+                <image src="../images/wx.png" />
+                <text>分享给微信好友</text>
+              </button>
+          </view>
+          <view wx:if="{{!shareBtn}}" @tap.stop="friendsFn">
+            <button>
+                <image src="../images/wx.png" />
+                <text>分享给微信好友</text>
+              </button>
+          </view>
+        </view>
+      </view>
+    </view>
+    <view data-sid="{{shareItem.sid}}" hidden="{{!isHidden}}" class="share-mask" @tap.stop="ontapShareMask">
+      <image mode="widthFix" @tap.stop="ontapSharePoster" class="share-poster" src="{{sharePoster}}" />
+    </view>
+    <view class="box" wx-if="{{arrData.length <= 0}}">
+      <image src="../images/no-attention.png" />
+      <view class="content">暂无内容，快去其他频道看看吧～</view>
+    </view>
+    <loading/>
+    <toast/>
+    <dialog/>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy';
+  import Service from '../common/services';
+  import Util from '@hzct/js-utils';
+  import formatSeconds from '../common/util/formatSeconds.js';
+  import Utils from '../common/util';
+  import UILoading from '../components/ui-loading';
+  import UIToast from '../components/ui-toast';
+  import UIDialog from '../components/ui-dialog';
+  import PosterConfig from '../common/util/poster-config.js';
+  import Canvas from '../common/util/canvas.js';
+  import Global from '../common/global.js'
+  import drawQrcode from 'weapp-qrcode'
+  import userSidArr from '../common/util/user.js'
+  const currentUser = Global.$data.currentUser;
+  const sharePosterConfig = new PosterConfig();
+  const poster = {};
+  export default class Home extends wepy.page {
+    components = {
+      'loading': UILoading,
+      'toast': UIToast,
+      'dialog': UIDialog
+    }
+    data = {
+      playIndex: null,
+      arrNavBar: [],
+      arrData: [],
+      arrTopic: [],
+      hotWorld: [],
+      scrollLeft: 0,
+      ind: -2,
+      videoPage: 1,
+      attentionPage: 1,
+      limit: 10,
+      sid: '',
+      shareItem: {},
+      isHidden: false,
+      sharePoster: '',
+      shareBtn: false,
+      isUser: false,
+      options: {},
+      totalCount: 0
+    }
+    onShow() {
+      if (Util.$$storage.getItem('_g_currentUser')) {
+        this.shareBtn = true
+        this.$apply()
+      } else {
+        this.shareBtn = false
+        this.$apply()
+      }
+    }
+    onShareAppMessage(options) {
+      const shareObj = {
+        title: "海鸥看世界",
+        path: '/pages/home',
+        imageUrl: ''
+      }
+      if (options.from === 'button') {
+        shareObj.title = this.shareItem.zhName
+        shareObj.path = '/pages/home?video_sid=' + this.shareItem.sid
+        shareObj.imageUrl = 'https:' + this.shareItem.thumbFileKeyUrl
+      }
+      return shareObj;
+    }
+    onLoad(options) {
+      this.page = 1;
+      const sid = options.video_sid;
+      if (sid) {
+        setTimeout(() => {
+          this.$navigate({
+            url: '../../detail?sid=' + sid
+          });
+        }, 1000)
+      }
+      if (options.q) {
+        const q = decodeURIComponent(options.q);
+        const action = q.split('?')[1].split('&')[0].split('=')[1]
+        const video_sid = q.split('?')[1].split('&')[1].split('=')[1]
+        if (action === 'video.shared' && video_sid) {
+          setTimeout(() => {
+            this.$navigate({
+              url: '../../detail?sid=' + video_sid
+            });
+          }, 1000)
+        }
+      }
+      this.$invoke('loading', 'show', 'Loading');
+      this._getDataList();
+      this._albumShow()
+      this._getAreaVideoList()
+    }
+    onRoute() {
+      this._albumShow()
+      this.arrData.forEach((item, index) => {
+        if (item.sid === this.sid) {
+          if (Util.$$storage.getItem('isLiked' + this.sid) || Util.$$storage.getItem('likeCount' + this.sid)) {
+            item.isLiked = Util.$$storage.getItem('isLiked' + this.sid)
+            item.likeCount = Util.$$storage.getItem('likeCount' + this.sid)
+          }
+          if (Util.$$storage.getItem('isFollowed' + this.sid)) {
+            item.topic.isFollowed = Util.$$storage.getItem('isFollowed' + this.sid)
+          }
+        }
+      })
+      this.$apply()
+      if (Util.$$storage.getItem('_g_currentUser')) {
+        this._getUserFollowedTopicList().then(() => {
+          this._getAttentionTopicList()
+          if (this.arrTopic.length === 0) {
+            this.ind = -2;
+            this.$apply()
+          }
+        })
+      }
+    }
+    methods = {
+      topicDetail(e) {
+        const sid = e.currentTarget.dataset.sid;
+        this.$navigate({
+          url: '../../topic-detail?sid=' + sid
+        });
+      },
+      allFn() {
+        this.$navigate({
+          url: '../../hot-world'
+        });
+      },
+      addAttention() {
+        this.$navigate({
+          url: '../../topic'
+        });
+      },
+      recommendFn() {
+        this.ind = -2;
+        this.playIndex = null;
+        this.arrData = [];
+        this.$apply();
+        this.$invoke('loading', 'show', 'Loading');
+        this._getDataList();
+      },
+      attentionFn() {
+        if (!Util.$$storage.getItem('_g_currentUser')) {
+          this.$navigate({
+            url: '../../login'
+          });
+          return;
+        }
+        this.$invoke('loading', 'show', 'Loading');
+        this._getUserFollowedTopicList().then(() => {
+          if (this.arrTopic.length === 0) {
+            this.$navigate({
+              url: '../../topic'
+            });
+            return;
+          }
+          this.ind = -1;
+          this.playIndex = null;
+          this.$apply();
+        })
+        this.$invoke('loading', 'show', 'Loading');
+        this._getAttentionTopicList()
+      },
+      shareFn(e) {
+        const ind = e.currentTarget.dataset.index;
+        this.arrData.forEach((item, index) => {
+          if (ind === index) {
+            this.shareItem = item;
+            this.$apply()
+            if (item.isShow) {
+              item.isShow = false;
+            } else {
+              item.isShow = true;
+              this.playIndex = null;
+              this.$apply()
+            }
+          } else {
+            item.isShow = false;
+          }
+        });
+        this.$apply();
+      },
+      detailFn(e) {
+        const sid = e.currentTarget.dataset.sid;
+        const videoSid = e.currentTarget.dataset.videosid;
+        this.sid = sid;
+        this.$navigate({
+          url: '../../detail?sid=' + sid
+        });
+      },
+      userFn() {
+        this.$navigate({
+          url: '../../user'
+        });
+      },
+      playFn(e) {
+        const curIdx = e.currentTarget.dataset.index;
+        if (!this.playIndex) {
+          this.playIndex = curIdx;
+          this.$apply();
+          const videoContext = wx.createVideoContext('video' + curIdx);
+          videoContext.play();
+        } else {
+          const videoContextPrev = wx.createVideoContext(
+            'video' + this.playIndex
+          );
+          if (this.playIndex != curIdx) {
+            videoContextPrev.pause();
+          }
+          this.playIndex = curIdx;
+          this.$apply();
+          const videoContextCurrent = wx.createVideoContext('video' + curIdx);
+          videoContextCurrent.play();
+        }
+      },
+      commentFn(e) {
+        if (!Util.$$storage.getItem('_g_currentUser')) {
+          this.$navigate({
+            url: '../../login'
+          });
+          return;
+        }
+        const sid = e.currentTarget.dataset.sid;
+        const videoSid = e.currentTarget.dataset.videosid;
+        this.$navigate({
+          url: '../../detail?sid=' + sid + '&flag=true'
+        });
+      },
+      likeFn(e) {
+        if (!Util.$$storage.getItem('_g_currentUser')) {
+          this.$navigate({
+            url: '../../login'
+          });
+          return;
+        }
+        const sid = e.currentTarget.dataset.sid;
+        this.arrData.forEach((item, index) => {
+          if (item.videoFile.web.videoSid === sid) {
+            if (item.isLiked === 0 || item.isLiked === 2) {
+              Service.$info.videoLike(sid).then(() => {
+                item.isLiked = 1
+                item.likeCount = item.likeCount * 1 + 1
+                this.$apply()
+                this.$invoke('toast', 'show', {
+                  content: '点赞成功',
+                  position: 'center'
+                });
+              })
+            } else if (item.isLiked === 1) {
+              Service.$info.videoUnlike(sid).then(() => {
+                item.isLiked = 2
+                item.likeCount = (item.likeCount * 1 - 1 < 0) ? 0 : (item.likeCount * 1 - 1)
+                this.$apply()
+                this.$invoke('toast', 'show', {
+                  content: '取消点赞成功',
+                  position: 'center'
+                });
+              })
+            }
+          }
+        })
+      },
+      addFn(e) {
+        if (!Util.$$storage.getItem('_g_currentUser')) {
+          this.$navigate({
+            url: '../../login'
+          });
+          return;
+        }
+        const sid = e.currentTarget.dataset.sid;
+        this.arrData.forEach((item, index) => {
+          if (item.topic.sid === sid) {
+            if (item.topic.isFollowed === 0 || item.topic.isFollowed === 2) {
+              Service.$topic.followTopic(sid).then(() => {
+                item.topic.isFollowed = 1
+                this.$apply()
+                this.$invoke('toast', 'show', {
+                  content: '关注成功',
+                  position: 'center'
+                });
+              })
+            } else if (item.topic.isFollowed === 1) {
+              Service.$topic.undoFollowTopic(sid).then(() => {
+                item.topic.isFollowed = 2
+                this.$apply()
+                this.$invoke('toast', 'show', {
+                  content: '取消关注成功',
+                  position: 'center'
+                });
+              })
+            }
+          }
+        })
+      },
+      ontapShareBtn() {
+        if (!Util.$$storage.getItem('_g_currentUser')) {
+          this.$navigate({
+            url: '../../login'
+          });
+          return;
+        }
+        this.playIndex = null;
+        this.$apply()
+        this.$invoke('toast', 'show', {
+          content: '海报生成中',
+          position: 'bottom'
+        });
+        this._sharePoster();
+      },
+      friendsFn() {
+        if (!Util.$$storage.getItem('_g_currentUser')) {
+          this.$navigate({
+            url: '../../login'
+          });
+          return;
+        } else {
+          this.shareBtn = true
+          this.$apply()
+        }
+      },
+      ontapShareMask() {
+        this.isHidden = false;
+        this.$apply()
+      },
+      ontapSharePoster() {
+        wx.previewImage({
+          current: poster.url,
+          urls: [poster.url],
+          success: () => {
+            this.isHidden = false;
+            this.$apply()
+          }
+        });
+      }
+    };
+    _albumShow() {
+      if (Util.$$storage.getItem('_g_currentUser')) {
+        userSidArr.forEach((item, index) => {
+          if (item === Util.$$storage.getItem('_g_currentUser').userSid) {
+            this.isUser = true;
+            this.$apply()
+          }
+        })
+      }
+    }
+    _draw(videoSid) {
+      return new Promise((resolve) => {
+        drawQrcode({
+          width: 75,
+          height: 75,
+          canvasId: 'myQrcode',
+          typeNumber: -1,
+          text: 'https://wx.kanshijie.com/mini/qrcode.html?action=video.shared&video_sid=' + videoSid
+        })
+        wx.canvasToTempFilePath({
+          x: 0,
+          y: 0,
+          width: 75,
+          height: 75,
+          destWidth: 225,
+          destHeight: 225,
+          fileType: 'jpg',
+          quality: 1,
+          canvasId: 'myQrcode',
+          success(res) {
+            resolve(res)
+          },
+          fail(e) {
+            console.error('生成图片或返回文件路径错误');
+            reject(e);
+          }
+        });
+      })
+    }
+    _saveImage() {
+      wx.saveImageToPhotosAlbum({
+        filePath: poster.url,
+        success: () => {
+          this.$apply();
+          this.$invoke('toast', 'show', {
+            content: '已保存到相册，点击当前海报可直接进行分享',
+            position: 'bottom'
+          });
+        },
+        fail: () => {
+          this.$invoke('toast', 'show', {
+            content: '保存失败',
+            position: 'bottom'
+          });
+        }
+      });
+    }
+    _getDataList() {
+      return Service.$home
+        .getVideoList({
+          page: this.videoPage,
+          limit: this.limit,
+          channel_sid: '',
+          scene_id: 'homeRecommend',
+          log_id: Util.$$encrypt.guid()
+        })
+        .then(res => {
+          this.totalCount = res.data.totalCount;
+          if (!res.data.items || res.data.items.length === 0) {
+            this.$invoke('loading', 'hide');
+            return;
+          }
+          this._getUrl(res.data.items).then(res => {
+            if (this.videoPage === 1) {
+              this.arrData = res
+            } else {
+              this.arrData = this.arrData.concat(res);
+            }
+            this.$apply();
+            this.$invoke('loading', 'hide');
+            return Promise.resolve(res);
+          })
+        });
+    }
+    _getUserFollowedTopicList() {
+      return Service.$topic.getUserFollowedTopicList({
+        page: 1,
+        limit: 100
+      }).then(res => {
+        if (!res.data.items || res.data.items.length === 0) {
+          this.arrTopic = [];
+          this.$apply()
+          this.$invoke('loading', 'hide');
+          return;
+        }
+        this._getUrl1(res.data.items).then(res => {
+          this.arrTopic = res
+          this.$apply();
+          this.$invoke('loading', 'hide');
+          return Promise.resolve(res);
+        })
+      });
+    }
+    _getAttentionTopicList() {
+      return Service.$topic.getAttentionTopicList({
+        page: this.attentionPage,
+        limit: 10
+      }).then(res => {
+        this.totalCount = res.data.totalCount;
+        if (!res.data.items || res.data.items.length === 0) {
+          this.$invoke('loading', 'hide');
+          return;
+        }
+        this._getUrl(res.data.items).then(res => {
+          if (this.attentionPage === 1) {
+            this.arrData = res
+          } else {
+            this.arrData = this.arrData.concat(res);
+          }
+          this.$apply();
+          this.$invoke('loading', 'hide');
+          return Promise.resolve(res);
+        })
+      })
+    }
+    _getAreaVideoList() {
+      return Service.$home.getAreaVideoList({
+        page: 1,
+        limit: 10
+      }).then(res => {
+        if (!res.data.items || res.data.items.length === 0) {
+          this.$invoke('loading', 'hide');
+          return;
+        }
+        this._getAreaUrl(res.data.items.splice(0, 5)).then(res => {
+          this.hotWorld = res;
+          this.$apply();
+          this.$invoke('loading', 'hide');
+          return Promise.resolve(res);
+        })
+      })
+    }
+    _getUrl1(arr) {
+      const formatData = arr.map((item, index) => {
+        Utils.$file.getUrl({
+          sid: item.iconBucketSid,
+          fileKey: item.iconFileKey
+        }).then(url => {
+          item.iconFileKeyUrl = url
+          this.$apply()
+        })
+        return item;
+      })
+      return Promise.resolve(formatData)
+    }
+    _getAreaUrl(arr) {
+      const formatData = arr.map((item, index) => {
+        Utils.$file.getUrl({
+          sid: item.area.badgeBucketSid,
+          fileKey: item.area.badgeFileKey
+        }).then(url => {
+          item.badgeFileKeyUrl = url
+        })
+        Utils.$file.getUrl({
+          sid: item.thumbBucketSid,
+          fileKey: item.thumbFileKey
+        }).then(url => {
+          item.thumbFileKeyUrl = url;
+          this.$apply()
+        })
+        return item;
+      })
+      return Promise.resolve(formatData)
+    }
+    _getUrl(arr) {
+      const formatData = arr.map((item, index) => {
+        if (item.isLiked === 1) {
+          item.likeCount = item.likeCount * 1 + 1
+        }
+        const videoFile = item.videoFile.web || item.videoFile['360p'];
+        videoFile.duration = formatSeconds(videoFile.duration);
+        Utils.$file.getUrl({
+          sid: item.thumbBucketSid,
+          fileKey: item.thumbFileKey
+        }).then(url => {
+          item.thumbFileKeyUrl = url;
+        })
+        Utils.$file.getUrl({
+          sid: item.topic.iconBucketSid,
+          fileKey: item.topic.iconFileKey
+        }).then(url => {
+          item.topic.iconFileKeyUrl = url
+        })
+        Utils.$file.getUrl({
+          sid: videoFile.videoBucketSid,
+          fileKey: videoFile.videoFileKey
+        }).then(url => {
+          videoFile.videoFileKeyUrl = url;
+          this.$apply()
+        })
+        return item;
+      })
+      return Promise.resolve(formatData)
+    }
+    _sharePoster() {
+      const _this = this
+      if (!_this.shareItem.thumbFileKeyUrl) {
+        _this.$invoke('toast', 'show', '本文不支持海报分享');
+        return;
+      }
+      Service.$home.qrcode().then(res => {
+        wx.getImageInfo({
+          src: 'https:' + _this.shareItem.thumbFileKeyUrl,
+          success: (res) => {
+            _this.$invoke('loading', 'show', '海报生成中');
+            const shareImgInfo = {
+              url: 'https:' + _this.shareItem.thumbFileKeyUrl,
+              width: res.width,
+              height: res.height
+            };
+            _this._draw(_this.shareItem.sid).then(res => {
+              sharePosterConfig.setConfigs(_this.shareItem.zhName, shareImgInfo, res.tempFilePath);
+              _this._drawPoster();
+              poster.hasTapedShare = true;
+              _this._showPoster();
+            })
+          },
+          fail: (err) => {
+            console.error(err)
+          }
+        })
+      })
+    }
+    _drawPoster() {
+      poster.isDrawing = true;
+      Canvas.drawPoster(sharePosterConfig.config).then(res => {
+        poster.isDrawing = false;
+        const url = res;
+        if (url) {
+          poster.url = url;
+          this._showPoster();
+        }
+      })
+    }
+    _showPoster() {
+      if (poster.isDrawing || !poster.hasTapedShare) {
+        return;
+      }
+      this.$invoke('loading', 'hide');
+      if (!poster.url) {
+        this.$invoke('toast', 'show', '分享海报生成失败');
+      } else {
+        this.sharePoster = poster.url;
+        this.$apply()
+        this.isHidden = true;
+        this.$apply()
+      }
+      poster.isDrawing = false;
+      poster.hasTapedShare = false;
+      this.$invoke('toast', 'show', {
+        content: '正在保存中',
+        position: 'bottom'
+      });
+      this._saveImage();
+    }
+    onReachBottom() {
+      if (this.ind === -2) {
+        if (this.totalCount <= this.attentionPage * 10) {
+          return
+        }
+        this.videoPage++;
+        this.$apply();
+        this._getDataList();
+      } else if (this.ind === -1) {
+        if (this.totalCount <= this.attentionPage * 10) {
+          return
+        }
+        this.attentionPage++;
+        this.$apply();
+        this._getAttentionTopicList()
+        this._getUserFollowedTopicList()
+      }
+    }
+    onPullDownRefresh() {
+      if (this.ind === -2) {
+        this.playIndex = null;
+        this.$apply();
+        this.$invoke('loading', 'show', 'Loading');
+        this._getDataList().then(() => {
+          wx.stopPullDownRefresh();
+        })
+      } else if (this.ind === -1) {
+        this.playIndex = null;
+        this.$invoke('loading', 'show', 'Loading');
+        this._getAttentionTopicList().then(() => {
+          wx.stopPullDownRefresh();
+        })
+      }
+    }
+  }
+</script>
+
+<style lang="less">
+  .home-page {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .tab-bar {
+    width: 100%;
+    height: 80rpx;
+    display: flex;
+    justify-content: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background: #101720;
+    z-index: 999;
+    .tabBar-item {
+      display: flex;
+      align-items: center;
+      padding: 0 60rpx;
+      font-size: 30rpx;
+      color: #b3b3c1;
+      display: inline-block;
+      position: relative;
+      margin-top: 10rpx;
+      .bar {
+        width: 20rpx;
+        height: 4rpx;
+        margin-top: 10rpx;
+        position: absolute;
+        left: 43%;
+        top: 40rpx;
+      }
+    }
+    .addClass {
+      color: #eb445a;
+      .bar {
+        background: #eb445a;
+      }
+    }
+    image {
+      width: 44rpx;
+      height: 44rpx;
+      position: absolute;
+      right: 32rpx;
+      top: 15rpx;
+    }
+  }
+  .container {
+    padding: 0 32rpx;
+    margin-top: 92rpx;
+    ::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+      color: transparent;
+    }
+    .topic-box {
+      white-space: nowrap;
+      padding-top: 16rpx;
+      padding-bottom: 26rpx;
+      .img {
+        width: 124rpx;
+        height: 124rpx;
+        margin: 0 16rpx;
+        display: inline-block;
+        position: relative;
+        background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAD4AAAA+CAYAAABzwahEAAAKiUlEQVRoQ+Wbe3RU1RXGv+/cmcwkIyEkTYOAEUroUkmQZx5QIxR8oEugJYmIS4oosS4IWtSyEKQBgo/6JuAqqYKoIA6kq9QlUhVQLBAwBhDCshJEExAjJgFCXszcs7vuxKQ8ZYJ5e/+buefus3/n7nPu3ufsTTThNRMSHgQkAN7+VLiGonuQ0pmUTgQcpAYhNYAuI+VbRTkIyD6DyFM11dum4fKjTaUeG1vwPNT0BgJSCH0bqfsCQlIsQPwAirrfqP/fuq/r///hvpCyS1G/DQX31JOX5zemro0CngqxRwLjBDKFlFiBZi0oKkjkUMwdmrKXCge0B984cKJ0ByKqLZBYFDsV7KGGXbrQkJ4Ao0EzVkHiQe1SFChABHqHDXqxVESuug/0/NRB+EngyRCjD8xJIGcDEgkLFiwl9RporvkWts2ZYM2lKLkQ+x3KFZSoqJMMIElohtYOphQagowO5T2WpoDmpci2nrlk8HR4Eg2oxaBE1wJjD0We88C+Kh30vc3GupbhoNPTAeOoZDqhY2qnBfZqeKfce+yazZfST4PB0yCOX0I/DWIKoBXBgxDMmA1jDaxJ26SXcFnHgiRSPwXqHgA04V18vMz5yDT0apBlNQh8Pqw5qN2g7q+AGk39jEsHLJgOVjUp71nC3SgKrOx0YpZS8jChHaTk2TwqZdzxmAP+6uE3eAY8iUKuBXSIghQoYcpMBOz0t6OmaPdmSH4/bfO4CYlSlGOEd/TtR2P9Mn2/wOfDO4aUlYQOBJDtkZOT0hF2oilgGirzjdCcYLsRsBQ0x5KoUqLHJ30X98+Lybko+HzUjFHkalLbCCyq0Y4H0kF9McHNeT8d6So6YuSLQpmqIF5Rkpz0zeAfhf9R8AxUJSql1pM6EIL5M3XgnOYEamhf2Z23ziP1Y7Vv3rx59JHrL2j2FwSfj+qehkIuac1pLJphBqU1VJGWaL+2i+U6yFRSjtloDrylaPh5F7zzglufrK6qaiso1uqdXWkGpbQ2877QoFpmP6Db9W5CjwUlTxWdGnwLbjnnU3de8CeNioWkpCnK/grPqYGtZSHz14LWha4LhisgF9S9CMkcWXjTtLOfPQf8SVt5oiI2KYiHMBIe8rha9JPlL+zZ7dZd+X4/BXMboe3QMuymolvPmO9ngLshxtf247tIRBNY8NCpkNmX2nFreO7fV67LUNSzFGVvycGqvilIqfftzwB/1n5iMmhmgTjImpDeze2RNfZgbe3mDqy2O/Mt91aRqUMPjP57XR/14Esg9kpHWYEVZVGQ8uCpsNWNrUhLyPuwx9pkKNPy7gpdB76PGoj7fCFtPfjz9rK7YJivWVHWg9Vh1zZ9wNE8wyAQfhyVvRuQGAMyYUhByutngL8YeDQH0HEUffe06stfbR61mqeXLb3cEwV6maJsH/zFHfH14IsCjvQWQ+0hpcxVGdH17kaOp5sH78K9bOq+zOl0OA8T0kmZp2JiCybm+0x9UdCRuYDMAXTW1Mpu97W0ok3Rf85Vry8hJJUK82L3TfiLD/wl1+E8QPdTUDf+saLr+03RcUvL/OTq128QmO8pYufAfRP7c+Fl+8PtcBSTqDxVXhPW0J2Mlgbyt/91UQsdEQGXlQASxFMVEczqcHiUwLNWERsmn+g+wl9BbbHdrt4vfyCU4UrLaC4JPphOyF+U8Il7y3s82haB/NV5d3TW46CeqShz+XLHA25AJytR4yed6Pmmv0LaYrvPYl4aT2IFKav5Ssf9n5B6IDTjJ5349fa2COSvzvl9FsUJJUcRuXy10+dFgO6maUZOKo0p8ldIW2y3J/rZK2w2WyEhh7g8NP8kIS6UmpdNwLUVbRHIX51393na5TBsFm8F3wjd4wHFFlDyue30sM1fYW2pnRvJRt/+8V5SvFwRtttDis32/Rc/C/D+AwbVgq8M33mS0C7PUdvPwtQ7BJi1pv5WeG4RKN20VyLvKI1t14tbwaCMKwywUAGH6I7Y8QmhBxISn1Sc0K4/Z0UDHo/ThplDIJfZnXN8DgwEd44tHryyLS1WDdW1KHbeeFBWGJYDk915SzopVpj2xO+O/KZdu6yH4tIfJ2UmIHO5tst/Rgm0L0gZdTixXQcpRxLmfADo4RSMprvz5nCnoYsVdKU6XB12vlOHhppUa2y/PyrN0SE8uISUIF0lEb6NiHe6bcgDpR+IG28tHNEuNyKKhzx6A0TeU5Sd4Vue7O8DXx/5wVyBngNI1sjCm9rl1tPRwX9eAjJVAfPCtjxVu/W0PnJ9b0XsAaTMTmfXYV8Na9TknZY2fRma7izzVh4GdSfRZkzYludrNxut6/3u7+QAEqeg7x7+1ah2tb38/XWPTFS+7WVsD9n87P+3ly3wDT3euQswX1OUPUO/HHUtmzyDqXnsQAAeT5zuO1AgZULHj14480AhF7n2k786VADqSINIua7g9+3iCKn8+geSNeAGUBh8siqKn2adeYRkjf/mnv+YDOosUg4aVdJ78KGUZk3jamwbkIQ/BZYHmPmE9FBAquujzHMPDa1O3XAbXXrJLitbkcSCIf8d16aPicuHTs0AMMvKgnT9orgvV68+/zGxBb+l14pERW4C4bGZnoRBBX9ok4kBFYlp/WDobaTYCQ4L3Lj4wokBdaa2/ao3FgI6DZQC8RwfEF8wrVXktPk7FUri0oIDg8xP4Uv805nOjUsungpiCbdOHcLtwVtpJf8Q2f/K/zolHemtKrftQoMggKoZfr9bRMaSOs8R4BjMdzP9S/6xhOZGv9qTYuayNoVzUd/81DaR7lX929RMEFMJORYgHMiNWf6ne9WNZt7Vf0tUNq4nJJCQ+X323N+qE/xqhqfOA+QxRVRB65vtG19peIJfHfxnMS+NIbGa0DZSFq3eXfJAazN7y7w9Iya/CMhURXihJdm24ZVLT+msg9/XN3MMISthvXlKtlGuJvVqJQteSdydwR07BC0V6LGEVEE4/mLQFtdFk3jr4fu9kGhAatO2Kfvtird3z32oRT91MuKefl7iLcJK5MMxTT3a/t7yxkvbroPfP+CvPSF0+1Z7q2yK+hm73bHgim3Tm9XDk4TkQK8reBYpDwPiUJQ8eiWFG5c3fqJ+PXzUQocRUvm0gkwBtfK5t8CMrjtmr6FVnNKElxVwmDfckwTIU7DcUIom9GIYRx/hu+82XWnG6UxfDspItFF8xThWcYwVzwvM57o6jVX8ML1R43kZOtHpsatxBjBdfFGWr1BvL8Ep9NO0z34ffs/x871IQbJxJD56EqBnAzrSKpRTRCngXWOjWlNaXL65V8G5zoM/RiFRIx3eK7smkjqJZJJAh/rkQwpBnYHg6qWn+97+yDy9zU8CrxMkA1Lt3znCx0FkilI6tr66kFKhgBzC3EHKXmh9wKs833iOlZdGfFbts4riPk5ncEiHUJvh7eIFehpKohUlFpR4QFxWrZmiCIEdEHMxSgNX1YWWDYVtdPDTBZYMmdEbSqcQchuh+1oVeOeWT55VTllXavlDmWVt6aUWBe4i9Nvwws1Ny1tfieWFRv7IdWnhLqoEUeyvRF9D1hbVKl9RrVhlUwBMa1EqU9Tf0koepuxTgjxUyzZ+vKzJimr/BwB6W0spvWAYAAAAAElFTkSuQmCC");
+        background-size: cover;
+        box-sizing: border-box;
+        &:first-child {
+          margin-left: 0;
+        }
+        .picture {
+          border-radius: 50%;
+          width: 108rpx;
+          height: 108rpx;
+          position: absolute;
+          display: block;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          margin: auto;
+        }
+      }
+    }
+    .part {
+      margin: 24rpx 0;
+      &:nth-child(1) {
+        margin-top: 0;
+      }
+      &:nth-child(2) {
+        margin-top: 0;
+      }
+      .hotworld {
+        padding: 56rpx 0 80rpx 0;
+        .hotworld-title {
+          display: flex;
+          justify-content: space-between;
+          color: #b3b3c1;
+          margin-bottom: 32rpx;
+          view {
+            display: flex;
+            align-items: center;
+            .hot-img {
+              width: 80rpx;
+              height: 80rpx;
+              margin-right: 16rpx;
+            }
+            .enter-img {
+              width: 10rpx;
+              height: 16rpx;
+              margin-left: 10rpx;
+            }
+          }
+          .all {
+            color: #b3b3c1;
+            font-size: 24rpx;
+          }
+        }
+        ::-webkit-scrollbar {
+          width: 0;
+          height: 0;
+          color: transparent;
+        }
+        .hotworld-scroll {
+          height: 360rpx;
+          min-height: 360rpx;
+          display: flex;
+          white-space: nowrap;
+          .world-item {
+            width: 412rpx;
+            margin-right: 32rpx;
+            .hotworld-pic {
+              width: 412rpx;
+              height: 240rpx;
+              min-height: 240rpx;
+              border-radius: 16rpx;
+              margin-bottom: 20rpx;
+            }
+            .hotworld-con {
+              width: 412rpx;
+              color: #b3b3c1;
+              font-size: 30rpx;
+              .hotworld-icon {
+                width: 98rpx;
+                height: 34rpx;
+                margin-right: 10rpx;
+              }
+            }
+            .ellipsis {
+              white-space: normal;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              display: -webkit-box;
+              -webkit-line-clamp: 2;
+              -webkit-box-orient: vertical;
+            }
+          }
+        }
+      }
+      .top_con {
+        width: 100%;
+        height: 400rpx;
+        .fm {
+          width: 100%;
+          height: 100%;
+          position: relative;
+          image {
+            width: 100%;
+            height: 100%;
+            border-radius: 16rpx;
+          }
+          .play {
+            width: 58rpx;
+            height: 66rpx;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            margin: auto;
+          }
+          .count {
+            position: absolute;
+            right: 30rpx;
+            bottom: 24rpx;
+            font-size: 28rpx;
+            color: #ffffff;
+            .text {
+              opacity: 0.7;
+              margin-right: 16rpx;
+            }
+          }
+        }
+      }
+      .bottom_con {
+        display: flex;
+        flex-direction: column;
+        margin-top: 12rpx;
+        position: relative;
+        .info {
+          display: flex;
+          .add {
+            width: 40rpx;
+            height: 40rpx;
+            position: absolute;
+            right: 20rpx;
+            top: 80rpx;
+          }
+          .pic {
+            display: inline-block;
+            width: 80rpx;
+            height: 80rpx;
+            border-radius: 50%;
+            margin-top: 8rpx;
+          }
+          .title {
+            flex: 1;
+            width: 100%;
+            font-size: 36rpx;
+            padding-right: 90rpx;
+            line-height: 48rpx;
+            color: #b3b3c1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+          }
+        }
+        .operation {
+          display: flex;
+          margin-top: 10rpx;
+          view {
+            display: flex;
+            align-items: center;
+            padding-right: 48rpx;
+            image {
+              width: 44rpx;
+              height: 44rpx;
+              margin-right: 10rpx;
+            }
+            text {
+              font-size: 26rpx;
+              color: #ffffff;
+              opacity: 0.4;
+            }
+          }
+        }
+        .share {
+          width: 38rpx;
+          height: 36rpx;
+          padding-right: 2rpx;
+        }
+      }
+    }
+  }
+  .dialog {
+    display: flex;
+    justify-content: center;
+    padding: 48rpx 0 4rpx 0;
+    view {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      button {
+        margin-top: 16rpx;
+        margin-left: 102rpx;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background: #101720;
+        text {
+          margin-top: 0;
+        }
+      }
+      image {
+        width: 80rpx;
+        height: 80rpx;
+      }
+      text {
+        color: #b3b3c1;
+        font-size: 26rpx;
+        margin-top: 16rpx;
+      }
+    }
+  }
+  .canvas {
+    position: fixed;
+    top: -2000px;
+    left: 0;
+  }
+  .box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    image {
+      width: 340rpx;
+      height: 340rpx;
+      margin-top: 204rpx;
+    }
+    .content {
+      margin-top: 50rpx;
+      font-size: 26rpx;
+      color: #ffffff;
+    }
+  }
+
+  .share-mask {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, .6);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    .share-poster {
+      width: 646rpx;
+      height: auto;
+    }
+  }
+</style>

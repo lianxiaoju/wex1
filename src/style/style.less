@@ -1,0 +1,417 @@
+.part {
+  margin-top: 16rpx;
+  .top_con {
+    position: relative;
+    .fm_pic {
+      width: 100%;
+      height: 440rpx;
+    }
+    .play {
+      width: 58rpx;
+      height: 66rpx;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      margin: auto;
+    }
+    .file {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: absolute;
+      bottom: 10rpx;
+      font-size: 28rpx;
+      color: #ffffff;
+      text-shadow: 0px 0px 1px rgba(0, 0, 0, .3);
+      .en {
+        font-size: 22rpx;
+      }
+      .text {
+        color: rgba(0, 0, 0, .4);
+        margin-right: 20rpx;
+      }
+    }
+    .fm {
+      width: 100%;
+      height: 440rpx;
+      position: relative;
+      image {
+        width: 100%;
+        height: 100%;
+      }
+      .play {
+        width: 58rpx;
+        height: 66rpx;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        margin: auto;
+      }
+      .count {
+        position: absolute;
+        right: 30rpx;
+        bottom: 24rpx;
+        font-size: 28rpx;
+        color: #ffffff;
+        .text {
+          opacity: 0.7;
+          margin-right: 16rpx;
+        }
+      }
+    }
+  }
+  .bottom_con {
+    padding: 0 32rpx;
+    display: flex;
+    flex-direction: column;
+    margin-top: 32rpx;
+    .message {
+      display: flex;
+      align-items: center;
+      position: relative;
+      .pic {
+        width: 80rpx;
+        height: 80rpx;
+        border-radius: 50%;
+        margin-right: 18rpx;
+      }
+      .nickename {
+        font-size: 30rpx;
+        color: #b3b3c1;
+      }
+      .add-up {
+        width: 104rpx;
+        height: 44rpx;
+        line-height: 44rpx;
+        background: #eb445a;
+        border-radius: 6rpx;
+        position: absolute;
+        right: 0;
+        top: 16rpx;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        image {
+          width: 16rpx;
+          height: 16rpx;
+          margin-right: 12rpx;
+        }
+        text {
+          color: #ffffff;
+          font-size: 22rpx;
+        }
+      }
+    }
+    .title {
+      width: 100%;
+      font-size: 36rpx;
+      color: #b3b3c1;
+      margin-top: 32rpx;
+    }
+    .operation {
+      display: flex;
+      margin-top: 52rpx;
+      position: relative;
+      view {
+        width: 172rpx;
+        display: flex;
+        align-items: center;
+        image {
+          width: 44rpx;
+          height: 44rpx;
+          margin-right: 10rpx;
+        }
+        text {
+          font-size: 26rpx;
+          color: #ffffff;
+          opacity: 0.4;
+        }
+      }
+    }
+    .comment-list {
+      margin-top: 32rpx;
+      image {
+        width: 100%;
+        height: 12rpx;
+      }
+      text {
+        margin-top: 30rpx;
+        font-size: 26rpx;
+        color: #ffffff;
+        opacity: 0.4;
+      }
+    }
+  }
+  .recommend {
+    margin-top: 80rpx;
+    padding: 0 32rpx;
+    .tit {
+      font-size: 30rpx;
+      color: #6f727d;
+    }
+    .recommend-part {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      .part-item {
+        width: 48%;
+        color: #b3b3c1;
+        font-size: 30rpx;
+        margin: 16rpx 0;
+        position: relative;
+        &:nth-child(even) {
+          margin-left: 18rpx;
+        }
+        image {
+          width: 334rpx;
+          height: 194rpx;
+          border-radius: 16rpx;
+        }
+        .count {
+          position: absolute;
+          right: 18rpx;
+          top: 158rpx;
+          font-size: 22rpx;
+          color: #ffffff;
+          .text {
+            opacity: 0.7;
+            margin-right: 20rpx;
+          }
+        }
+      }
+    }
+  }
+  .dialog {
+    margin-top: 16rpx;
+  }
+}
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.dialog {
+  display: flex;
+  justify-content: center;
+  padding-top: 52rpx;
+  view {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    button {
+      margin-top: 16rpx;
+      margin-left: 102rpx;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: #101720;
+      text {
+        margin-top: 0;
+      }
+    }
+    image {
+      width: 80rpx;
+      height: 80rpx;
+    }
+    text {
+      color: #b3b3c1;
+      font-size: 26rpx;
+      margin-top: 16rpx;
+    }
+  }
+}
+.canvas {
+  position: fixed;
+  top: -2000px;
+  left: 0;
+}
+.share-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, .6);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  .share-poster {
+    width: 646rpx;
+    height: auto;
+  }
+}
+.commentBox {
+  width: 100%;
+  height: 678rpx;
+  display: flex;
+  flex-direction: column;
+  background: #101720;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  z-index: 99999;
+  padding-bottom: 96rpx;
+  overflow-y: scroll;
+  .tit {
+    padding: 32rpx 32rpx 44rpx;
+    height: 44rpx;
+    line-height: 44rpx;
+    display: flex;
+    justify-content: space-between;
+    color: #b3b3c1;
+    font-size: 26rpx;
+    image {
+      width: 44rpx;
+      height: 44rpx;
+    }
+  }
+  .no-comment {
+    display: flex;
+    justify-content: center;
+    image {
+      margin-top: 72rpx;
+      width: 268rpx;
+      height: 310rpx;
+    }
+  }
+  .commentItem {
+    margin: 52rpx 40rpx 0;
+    border-bottom: 1px solid #080B10;
+    .comment-info {
+      display: flex;
+      image {
+        width: 68rpx;
+        height: 68rpx;
+        border-radius: 50%;
+      }
+      .userinfo {
+        display: flex;
+        flex-direction: column;
+        margin-left: 20rpx;
+        font-size: 26rpx;
+        color: #b3b3c1;
+        .time {
+          font-size: 22rpx;
+          color: #50555a;
+          margin-top: 12rpx;
+        }
+      }
+    }
+    .comment-con {
+      margin-left: 88rpx;
+      font-size: 30rpx;
+      color: #b3b3c1;
+      margin-top: 24rpx;
+      .comment-surplus {
+        margin-top: 32rpx;
+        border-radius: 8rpx;
+        background: rgba(102, 103, 114, 0.1);
+        padding: 32rpx;
+        .comment-reply {
+          display: flex;
+          flex-direction: column;
+          view {
+            display: flex;
+            flex-direction: column;
+            margin-top: 32rpx;
+            &:nth-child(1) {
+              margin-top: 0;
+            }
+            text {
+              color:rgba(179, 179, 193, .4);
+              font-size: 26rpx;
+            }
+            .reply-con {
+              color: #b3b3c1;
+              margin-top: 12rpx;
+            }
+          }
+        }
+        .surplus {
+          margin-top: 32rpx;
+          image {
+            width: 10rpx;
+            height: 16rpx;
+            margin-left: 12rpx;
+          }
+        }
+      }
+      .cz {
+        display: flex;
+        margin: 32rpx 0 52rpx;
+        view {
+          display: flex;
+          align-items: center;
+          image {
+            width: 44rpx;
+            height: 44rpx;
+          }
+          text {
+            margin-left: 10rpx;
+          }
+          &:nth-child(2) {
+            margin-left: 84rpx;
+          }
+        }
+      }
+    }
+  }
+  .comment-ipt {
+    width: 100%;
+    padding: 16rpx 0;
+    background: #1a232f;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    text {
+      width: 686rpx;
+      height: 64rpx;
+      line-height: 64rpx;
+      padding-left: 24rpx;
+      font-size: 26rpx;
+      color: rgba(255, 255, 255, .4);
+      background: #101720;
+      border-radius: 8rpx;
+    }
+    input {
+      width: 558rpx;
+      background: #ffffff;
+      color: #000000;
+      margin-left: 32rpx;
+      min-height: 64rpx;
+      white-space: wrap;
+      font-size: 26rpx;
+      border-radius: 8rpx;
+      white-space: wrap;
+      padding-left: 24rpx;
+      margin-bottom: 20rpx;
+    }
+    button {
+      margin-bottom: 20rpx;
+      width: 96rpx;
+      height: 60rpx;
+      line-height: 60rpx;
+      background: rgba(235, 68, 90, 1);
+      border-radius: 8rpx;
+      margin-left: 32rpx;
+      font-size: 26rpx;
+      color: #ffffff;
+      font-weight:400;
+      padding: 0;
+    }
+  }
+}
